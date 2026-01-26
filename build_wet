@@ -1,0 +1,111 @@
+#!/bin/bash
+
+# Parse command line arguments
+CLEAN=false
+SAFE=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --clean)
+      CLEAN=true
+      shift
+      ;;
+    --safe)
+      SAFE=true
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: ./build_wet [OPTIONS]"
+      echo "Options:"
+      echo "  --clean    Clean workspace before building (rm -rf build install log)"
+      echo "  --safe     Use single-threaded build (prevents CPU freezes)"
+      echo "  -h, --help Show this help message"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Use --help for usage information"
+      exit 1
+      ;;
+  esac
+done
+
+unameOut="$(uname -s)"
+case "${unameOut}" in
+    Linux*)     machine=Linux;;
+    Darwin*)    machine=Mac;;
+    CYGWIN*)    machine=Cygwin;;
+    MINGW*)     machine=MinGw;;
+    *)          machine="UNKNOWN:${unameOut}"
+esac
+
+if [[ $machine == "Linux" ]]
+then
+  echo "Detected ${machine} environment. Building WET workspace only."
+
+  # Set GCC-9 as compiler for CUDA compatibility
+  export CC=/usr/bin/gcc-9
+  export CXX=/usr/bin/g++-9
+  export CUDAHOSTCXX=/usr/bin/g++-9
+
+  source ../.venv/bin/activate
+
+  # Make sure dry workspace is sourced first
+  source workon
+
+  cd wet/
+
+  # Clean workspace if --clean flag is set
+  if [[ $CLEAN == true ]]; then
+    echo "Cleaning wet workspace..."
+    rm -rf build install log
+    unset CMAKE_PREFIX_PATH  # Suppress colcon warnings
+  fi
+
+  # Build with colcon
+  if [[ $SAFE == true ]]; then
+    echo "Building in safe mode (single-threaded)..."
+    colcon build --parallel-workers 1 --executor sequential --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX}
+  else
+    echo "Building in parallel mode..."
+    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX}
+  fi
+
+  cd ..
+  source workon
+fi
+
+if [[ $machine == "Mac" ]]
+then
+  echo "Detected ${machine} environment. Building WET workspace only (CPU support only)."
+
+  touch ./wet/src/sogmm_open3d/COLCON_IGNORE
+
+  source .venv/bin/activate
+
+  # Make sure dry workspace is sourced first
+  source workon
+
+  cd wet/
+
+  # Clean workspace if --clean flag is set
+  if [[ $CLEAN == true ]]; then
+    echo "Cleaning wet workspace..."
+    rm -rf build install log
+    unset CMAKE_PREFIX_PATH  # Suppress colcon warnings
+  fi
+
+  # Build with colcon
+  if [[ $SAFE == true ]]; then
+    echo "Building in safe mode (single-threaded)..."
+    colcon build --parallel-workers 1 --executor sequential --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+  else
+    echo "Building in parallel mode..."
+    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+  fi
+
+  cd ..
+  source workon
+fi
+
+echo "WET workspace build complete!"

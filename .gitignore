@@ -6,8 +6,6 @@ __pycache__/
 
 # Build artifacts
 build/
-build_dry
-build_wet
 install/
 log/
 .cache/

@@ -36,6 +36,9 @@ wet/*.md
 # KITTI sequence output folders
 wet/src/gmm_d2d_registration_examples/python/kitti_sequence_*/
 
+# Other repos
+puma/
+
 # Demo outputs - for now
 demo_results/
 demo_reconstruction.py

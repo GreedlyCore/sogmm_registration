@@ -28,15 +28,15 @@ then
   cd ..
   source workon
 
-  cd dry/build/open3d_colcon/
-  make install-pip-package -j${nproc}
+  # cd dry/build/open3d_colcon/
+  # make install-pip-package -j${nproc}
 fi
 
 if [[ $machine == "Mac" ]]
 then
   echo "Detected ${machine} environment. Building with CPU support only."
 
-  touch ./wet/src/sogmm_open3d/COLCON_IGNORE
+  # touch ./wet/src/sogmm_open3d/COLCON_IGNORE
 
   source .venv/bin/activate
   cd dry/
@@ -48,7 +48,7 @@ then
   cd ..
   source workon
 
-  numcores=$(sysctl -n hw.logicalcpu)
-  cd dry/build/open3d_colcon/
-  make install-pip-package -j${numcores}
+  # numcores=$(sysctl -n hw.logicalcpu)
+  # cd dry/build/open3d_colcon/
+  # make install-pip-package -j${numcores}
 fi

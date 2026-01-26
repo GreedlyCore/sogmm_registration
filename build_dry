@@ -69,15 +69,15 @@ then
   cd ..
   source workon
 
-  echo "Installing Open3D pip package..."
-  cd dry/build/open3d_colcon/
-  if [[ $SAFE == true ]]; then
-    make install-pip-package -j1
-  else
-    make install-pip-package -j$(nproc)
-  fi
+  # echo "Installing Open3D pip package..."
+  # cd dry/build/open3d_colcon/
+  # if [[ $SAFE == true ]]; then
+  #   make install-pip-package -j1
+  # else
+  #   make install-pip-package -j$(nproc)
+  # fi
 
-  cd ../../..
+  # cd ../../..
 fi
 
 if [[ $machine == "Mac" ]]
@@ -108,15 +108,15 @@ then
   source workon
 
   echo "Installing Open3D pip package..."
-  cd dry/build/open3d_colcon/
-  if [[ $SAFE == true ]]; then
-    make install-pip-package -j1
-  else
-    numcores=$(sysctl -n hw.logicalcpu)
-    make install-pip-package -j${numcores}
-  fi
+  # cd dry/build/open3d_colcon/
+  # if [[ $SAFE == true ]]; then
+  #   make install-pip-package -j1
+  # else
+  #   numcores=$(sysctl -n hw.logicalcpu)
+  #   make install-pip-package -j${numcores}
+  # fi
 
-  cd ../../..
+  # cd ../../..
 fi
 
 echo "DRY workspace build complete!"

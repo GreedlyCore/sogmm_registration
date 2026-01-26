@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <fstream>
 #include <memory>
 #include <random>
 
@@ -522,6 +523,100 @@ public:
     support_size_ += that.support_size_;
     converged_ = true;
     n_components_ += that.n_components_;
+  }
+
+  // Getters for compatibility with gmm_d2d_registration
+  unsigned int getNClusters() const { return n_components_; }
+  const Vector& getWeights() const { return weights_; }
+  const MatrixXC& getCovs() const { return covariances_; }
+  const MatrixXD& getMeans() const { return means_; }
+
+  // Modify covariances to be isoplanar (flatten them)
+  void makeCovsIsoplanar()
+  {
+    for (unsigned int k = 0; k < n_components_; k++)
+    {
+      VectorC cov_vec = covariances_.row(k);
+      MatrixDD cov = Eigen::Map<MatrixDD>(cov_vec.data(), D, D);
+
+      // Compute eigenvalues and eigenvectors
+      Eigen::SelfAdjointEigenSolver<MatrixDD> es(cov);
+      VectorD eigenvalues = es.eigenvalues();
+      MatrixDD eigenvectors = es.eigenvectors();
+
+      // Set smallest eigenvalue to mean of two largest
+      T min_eval = eigenvalues.minCoeff();
+      eigenvalues = eigenvalues.array().max(min_eval);
+      eigenvalues(0) = (eigenvalues(1) + eigenvalues(2)) / 2.0;
+
+      // Reconstruct covariance
+      cov = eigenvectors * eigenvalues.asDiagonal() * eigenvectors.transpose();
+      covariances_.row(k) = Eigen::Map<VectorC>(cov.data(), C);
+    }
+    precisions_cholesky_ = computeCholesky(covariances_);
+  }
+
+  // Load GMM from file (simple binary format)
+  void load(const std::string& filename)
+  {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file.is_open())
+    {
+      throw std::runtime_error("Cannot open file: " + filename);
+    }
+
+    // Read n_components
+    file.read(reinterpret_cast<char*>(&n_components_), sizeof(n_components_));
+
+    // Resize matrices
+    weights_.resize(n_components_);
+    means_.resize(n_components_, D);
+    covariances_.resize(n_components_, C);
+
+    // Read weights
+    file.read(reinterpret_cast<char*>(weights_.data()),
+              n_components_ * sizeof(T));
+
+    // Read means
+    file.read(reinterpret_cast<char*>(means_.data()),
+              n_components_ * D * sizeof(T));
+
+    // Read covariances
+    file.read(reinterpret_cast<char*>(covariances_.data()),
+              n_components_ * C * sizeof(T));
+
+    file.close();
+
+    // Compute precision cholesky
+    precisions_cholesky_ = computeCholesky(covariances_);
+    converged_ = true;
+  }
+
+  // Save GMM to file (simple binary format)
+  void save(const std::string& filename) const
+  {
+    std::ofstream file(filename, std::ios::binary);
+    if (!file.is_open())
+    {
+      throw std::runtime_error("Cannot create file: " + filename);
+    }
+
+    // Write n_components
+    file.write(reinterpret_cast<const char*>(&n_components_), sizeof(n_components_));
+
+    // Write weights
+    file.write(reinterpret_cast<const char*>(weights_.data()),
+               n_components_ * sizeof(T));
+
+    // Write means
+    file.write(reinterpret_cast<const char*>(means_.data()),
+               n_components_ * D * sizeof(T));
+
+    // Write covariances
+    file.write(reinterpret_cast<const char*>(covariances_.data()),
+               n_components_ * C * sizeof(T));
+
+    file.close();
   }
 
   Vector weights_;

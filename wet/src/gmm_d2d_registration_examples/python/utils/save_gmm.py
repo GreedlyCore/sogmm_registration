@@ -23,5 +23,7 @@ def save_sogmm(filepath, gmm_4d):
         data[i, 0:3] = means_3d[i, :]
         data[i, 3:12] = covs_3d[i].flatten()
         data[i, 12] = gmm_4d.weights_[i]
-    np.savetxt(filepath, X=data, fmt='%.30f', delimiter=',')
+    np.savetxt(filepath, X=data, fmt='%.15f', delimiter=',')
+    # TODO: is it enough such accuracy?
+    # np.savetxt(filepath, X=data, fmt='%.30f', delimiter=',')
 

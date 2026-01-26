@@ -39,7 +39,11 @@ namespace sogmm
       using MatrixDX = typename Container::MatrixDX;
       using MatrixXC = typename Container::MatrixXC;
 
-      EM() : EM(1e-3, 1e-6, 100)
+      // EM() : EM(1e-3, 1e-6, 100)
+      // {
+      // }
+
+      EM() : EM(1e-2, 1e-6, 80)
       {
       }
 

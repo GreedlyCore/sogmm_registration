@@ -1,17 +1,18 @@
 cmake_minimum_required(VERSION 3.13)
 
 project(self_organizing_gmm
-	VERSION 0.0.0
-	DESCRIPTION
-	"PRI Mapping"
-	LANGUAGES CXX C)
+  VERSION 0.0.0
+  DESCRIPTION
+  "PRI Mapping"
+  LANGUAGES CXX C)
 
 # configuration
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+# TODO: testing -fopenmp --> -fopenmp-simd
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(CMAKE_CXX_FLAGS "-std=c++17 -stdlib=libc++ -march=native -O3 -ffast-math -fno-math-errno -mfma -funroll-loops -DNDEBUG -DEIGEN_NO_DEBUG")
   set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp /usr/local/lib/libomp.dylib -I/usr/local/include")
   set(OpenMP_CXX_LIB_NAMES "libomp")
@@ -24,6 +25,7 @@ else()
   # -Wno-enum-compare: suppress EigenRand + Eigen 3.4 enum mismatch warning in RandUtils.h
   set(CMAKE_CXX_FLAGS "-std=c++17 -march=native -O3 -fopenmp -Wno-enum-compare -ffast-math -fno-math-errno -mfma -funroll-loops -DNDEBUG -DEIGEN_NO_DEBUG")
 endif()
+
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 # find dependencies
@@ -37,8 +39,9 @@ include(FetchContent)
 FetchContent_Declare(
   EigenRand
   GIT_REPOSITORY https://github.com/bab2min/EigenRand.git
-  GIT_TAG        v0.5.1
+  GIT_TAG v0.5.1
 )
+
 # Disable EigenRand tests and benchmarks
 set(EIGENRAND_BUILD_TEST OFF CACHE BOOL "" FORCE)
 set(EIGENRAND_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)

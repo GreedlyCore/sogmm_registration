@@ -135,12 +135,12 @@ def remove_plane_ransac(points, distance_threshold=0.3, ransac_n=3, num_iteratio
 # TODO: add statistical outlier filter too ???
 # when will be ported to pure cpp --> use pcl library for that ??? 
 
-def convert_kitti_to_gmm(sequence_dir, output_dir, n_components=100,
+def convert_kitti_to_gmm(sequence_dir, output_dir, n_components=None,
                          use_voxel_filter=False, voxel_size=0.1,
                          use_radius_filter=False, radius=5.0,
                          use_plane_removal=False, ransac_distance=0.3, ransac_iters=1000,
                          start_idx=0, end_idx=None, implementation='fsogmm',
-                         bandwidth=0.05):
+                         bandwidth=None):
     """
     Convert KITTI velodyne scans to GMM format.
 
@@ -157,6 +157,12 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, n_components=100,
         implementation: GMM implementation to use ('fsogmm' or 'sogmm')
         bandwidth: Bandwidth for SOGMM (only used with --implementation sogmm)
     """
+    # Validate parameters based on implementation
+    if implementation == 'fsogmm' and n_components is None:
+        raise ValueError("fsogmm requires n_components parameter")
+    if implementation == 'sogmm' and bandwidth is None:
+        raise ValueError("sogmm requires bandwidth parameter")
+
     velodyne_dir = os.path.join(sequence_dir, 'velodyne')
 
     if not os.path.exists(velodyne_dir):
@@ -236,7 +242,8 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, n_components=100,
         xyz = points_4d[:, :3]
         xyz_with_intensity = points_4d
 
-        if len(xyz) < n_components * 3:
+        # Warn if too few points for fixed component GMM
+        if implementation == 'fsogmm' and len(xyz) < n_components * 3:
             print(f'\nWARNING: {bin_file} has only {len(xyz)} points, '
                   f'might be too few for {n_components} components')
 
@@ -291,8 +298,10 @@ def main():
                         help='Path to KITTI dataset root')
     parser.add_argument('--output_dir', type=str, default=None,
                         help='Output directory (default: ./kitti_sequence_{ID})')
-    parser.add_argument('--n_components', type=int, default=100,
-                        help='Number of GMM components (default: 100)')
+    parser.add_argument('--n_components', type=int, default=None,
+                        help='Number of GMM components for fsogmm (fixed components)')
+    parser.add_argument('--bandwidth', type=float, default=None,
+                        help='Bandwidth for sogmm (adaptive components)')
     parser.add_argument('--voxel_filter', action='store_true',
                         help='Enable voxel filtering to reduce point count')
     parser.add_argument('--voxel_size', type=float, default=0.1,
@@ -309,13 +318,30 @@ def main():
                         help='RANSAC iterations (default: 1000)')
     parser.add_argument('--start_idx', type=int, default=0,
                         help='First scan index (default: 0)')
-    parser.add_argument('--implementation', type=str,
-                        choices=['fsogmm', 'sogmm'], default='fsogmm',
-                        help='GMM implementation (CPU only): fsogmm (fixed components) or sogmm (adaptive)')
-    parser.add_argument('--bandwidth', type=float, default=0.05,
-                        help='Bandwidth for SOGMM (only used with --implementation sogmm, default: 0.05)')
 
     args = parser.parse_args()
+
+    # Auto-detect implementation based on provided parameters
+    if args.bandwidth is not None and args.n_components is not None:
+        print('ERROR: Specify either --bandwidth (for sogmm) OR --n_components (for fsogmm), not both')
+        sys.exit(1)
+    elif args.bandwidth is not None:
+        args.implementation = 'sogmm'
+        print(f'Using SOGMM (adaptive) with bandwidth={args.bandwidth}')
+    elif args.n_components is not None:
+        args.implementation = 'fsogmm'
+        print(f'Using fsogmm (fixed) with n_components={args.n_components}')
+    else:
+        print('ERROR: Must specify either --bandwidth (for sogmm) OR --n_components (for fsogmm)')
+        sys.exit(1)
+
+    # Auto-detect dataset location if using default
+    if args.kitti_dir == './dataset/kitti':
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # Try relative to script location first (wet/src/.../python -> ../../../../dataset/kitti)
+        repo_dataset = os.path.join(script_dir, '../../../../dataset/kitti')
+        if os.path.exists(repo_dataset):
+            args.kitti_dir = repo_dataset
 
     # Expand ~ to home directory
     args.kitti_dir = os.path.expanduser(args.kitti_dir)

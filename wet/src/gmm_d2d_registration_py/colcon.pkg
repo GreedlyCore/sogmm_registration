@@ -1,0 +1,9 @@
+{
+  "name": "gmm_d2d_registration_py",
+  "dependencies":
+  {
+    "dlib_colcon",
+    "gmm_d2d_registration",
+    "gmm"
+  }
+}

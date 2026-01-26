@@ -1,8 +1,0 @@
-{
-  "name": "gmm_d2d_registration",
-  "dependencies":
-  {
-    "dlib_colcon",
-    "gmm"
-  }
-}

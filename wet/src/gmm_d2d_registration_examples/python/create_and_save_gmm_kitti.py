@@ -10,25 +10,14 @@ from tqdm import tqdm
 import argparse
 from datetime import datetime
 
-from utils.save_gmm import save, save_sogmm
-from sklearn.mixture import GaussianMixture
-from gmm_d2d_registration_py import GMM3f
+from utils.save_gmm import save_sogmm
     
 from sogmm_py import SOGMM
 # Create GMM with profiling enabled
 from gmm_py import GMMf4CPU
 # K-Means++ initialization (same as in sogmm.py gmm_fit)
 from kinit_py import KInitf4CPU
-
-# GPU support (optional - will be None if not available)
-try:
-    from mean_shift_py import KernelType, MeanShift as MSf2
-    from sogmm_gpu import SOGMMf4Device, SOGMMLearner
-    from sogmm_cpu import SOGMMf4Host
-    HAS_GPU = True
-except ImportError:
-    HAS_GPU = False
-    print("Warning: GPU modules not available. Use --device cpu or install GPU support.")
+from sogmm_cpu import SOGMMf4Host
 
 def load_kitti_velodyne(filepath):
     """
@@ -150,8 +139,8 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, n_components=100,
                          use_voxel_filter=False, voxel_size=0.1,
                          use_radius_filter=False, radius=5.0,
                          use_plane_removal=False, ransac_distance=0.3, ransac_iters=1000,
-                         start_idx=0, end_idx=None, implementation='cpp',
-                         bandwidth=0.05, device='cpu'):
+                         start_idx=0, end_idx=None, implementation='fsogmm',
+                         bandwidth=0.05):
     """
     Convert KITTI velodyne scans to GMM format.
 
@@ -165,9 +154,8 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, n_components=100,
         radius: Maximum distance from origin (in meters)
         start_idx: First scan index to process
         end_idx: Last scan index to process (None = all)
-        implementation: GMM implementation to use ('cpp', 'sklearn', 'sogmm', etc.)
+        implementation: GMM implementation to use ('fsogmm' or 'sogmm')
         bandwidth: Bandwidth for SOGMM (only used with --implementation sogmm)
-        device: Device to use for SOGMM ('cpu' or 'gpu', only applies to sogmm implementation)
     """
     velodyne_dir = os.path.join(sequence_dir, 'velodyne')
 
@@ -188,11 +176,7 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, n_components=100,
     print(f'Converting {len(bin_files)} scans to GMM format...')
     if implementation == 'sogmm':
         print(f'Implementation: {implementation} (adaptive)')
-        print(f'Device: {device.upper()}')
         print(f'Bandwidth: {bandwidth}')
-        if device == 'gpu' and not HAS_GPU:
-            print('ERROR: GPU support not available. Please build sogmm_open3d or use --device cpu')
-            sys.exit(1)
     else:
         print(f'Implementation: {implementation}')
         print(f'Components: {n_components}')
@@ -217,7 +201,6 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, n_components=100,
         f.write(f"implementation: {implementation}\n")
         if implementation == 'sogmm':
             f.write(f"bandwidth: {bandwidth}\n")
-            f.write(f"device: {device}\n")
         else:
             f.write(f"n_components: {n_components}\n")
         f.write(f"\n# Filtering parameters\n")
@@ -256,14 +239,8 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, n_components=100,
         if len(xyz) < n_components * 3:
             print(f'\nWARNING: {bin_file} has only {len(xyz)} points, '
                   f'might be too few for {n_components} components')
-        
-        if implementation == 'cpp':
-            gmm = GMM3f()
-            gmm.fit(xyz, n_components)
-        elif implementation == 'sklearn':
-            gmm = GaussianMixture(n_components=n_components, covariance_type='full')
-            gmm.fit(xyz)
-        elif implementation == 'fsogmm':
+
+        if implementation == 'fsogmm':
             # Fixed component SOGMM --- need to bypass SOGMM wrapper to enable profiling
             n_samples = xyz_with_intensity.shape[0]
             kinit = KInitf4CPU()
@@ -288,41 +265,10 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, n_components=100,
             os.makedirs(stats_dir, exist_ok=True)
             stats_file_prefix = bin_file.split(".")[0]
 
-            if device == 'gpu':
-                # GPU SOGMM implementation
-                # Extract mean-shift data (distance + intensity)
-                d = np.array([np.linalg.norm(x) for x in xyz_with_intensity[:, 0:3]])[:, np.newaxis]
-                g = xyz_with_intensity[:, 3][:, np.newaxis]
-                ms_data = np.concatenate((d, g), axis=1)
-
-                # Create GPU learner with profiling support
-                # After rebuilding sogmm_open3d, this will create profiling CSV files:
-                #   - {stats_file_prefix}_ms.csv  (Mean Shift timings)
-                #   - {stats_file_prefix}_em.csv  (GPU EM timings: e_step, m_step)
-                # Note: KInit doesn't support profiling in current version
-                learner_gpu = SOGMMLearner(
-                    bandwidth=bandwidth,
-                    kernel='flat',
-                    save_stats=True,
-                    stats_dir=stats_dir,
-                    stats_file_prefix=f"gpu_{stats_file_prefix}"
-                )
-                model_gpu = SOGMMf4Device()
-
-                # Fit on GPU
-                learner_gpu.fit(ms_data, xyz_with_intensity, model_gpu)
-                n_components_gpu = model_gpu.n_components_
-
-                # Convert to CPU for saving
-                model_cpu = SOGMMf4Host(n_components_gpu)
-                model_gpu.to_host(model_cpu)
-                local_model = model_cpu
-                print(f"SOGMM (GPU) fitted with {n_components_gpu} components...")
-            else:
-                # CPU SOGMM implementation (original)
-                sg = SOGMM(bandwidth, save_stats=True, stats_dir=stats_dir, stats_file_prefix=stats_file_prefix)
-                local_model = sg.fit(xyz_with_intensity)
-                print(f"SOGMM (CPU) fitted with {local_model.n_components_} components...")
+            # CPU SOGMM implementation
+            sg = SOGMM(bandwidth, save_stats=True, stats_dir=stats_dir, stats_file_prefix=stats_file_prefix)
+            local_model = sg.fit(xyz_with_intensity)
+            print(f"SOGMM (CPU) fitted with {local_model.n_components_} components...")
 
             gmm_4d = local_model
 
@@ -330,11 +276,7 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, n_components=100,
         # Save GMM (use 1-based indexing to match MATLAB convention --> first scan is named 1.gmm)
         idx = int(bin_file.split('.')[0]) + 1
         output_path = os.path.join(gmm_output_dir, f'{idx}.gmm')
-
-        if implementation in ['fsogmm', 'sogmm']:
-            save_sogmm(output_path, gmm_4d)
-        else:
-            save(output_path, gmm)
+        save_sogmm(output_path, gmm_4d)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -368,13 +310,10 @@ def main():
     parser.add_argument('--start_idx', type=int, default=0,
                         help='First scan index (default: 0)')
     parser.add_argument('--implementation', type=str,
-                        choices=['sklearn', 'cpp', 'fsogmm', 'sogmm'], default='cpp',
-                        help='GMM implementation(CPU): sklearn  or handmade cpp or fixed sogmm model or adaptive sogmm')
+                        choices=['fsogmm', 'sogmm'], default='fsogmm',
+                        help='GMM implementation (CPU only): fsogmm (fixed components) or sogmm (adaptive)')
     parser.add_argument('--bandwidth', type=float, default=0.05,
                         help='Bandwidth for SOGMM (only used with --implementation sogmm, default: 0.05)')
-    parser.add_argument('--device', type=str,
-                        choices=['cpu', 'gpu'], default='cpu',
-                        help='Device to use for SOGMM (only applies to --implementation sogmm, default: cpu)')
 
     args = parser.parse_args()
 
@@ -419,8 +358,7 @@ def main():
         start_idx=args.start_idx,
         end_idx=end_idx,
         implementation=args.implementation,
-        bandwidth=args.bandwidth,
-        device=args.device
+        bandwidth=args.bandwidth
     )
 
 

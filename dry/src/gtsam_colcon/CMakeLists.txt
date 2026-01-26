@@ -1,0 +1,36 @@
+cmake_minimum_required(VERSION 2.8)
+project(gtsam_colcon)
+
+set(MATLAB_ROOT "")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
+
+find_package(MATLAB QUIET)
+
+set(MATLAB_TOOLBOX OFF)
+if (MATLAB_FOUND)
+  set(MATLAB_TOOLBOX ON)
+endif()
+
+
+include(ExternalProject)
+externalproject_add(gtsam_src
+  GIT_REPOSITORY git@github.com:borglab/gtsam.git
+  GIT_TAG c57988fe554e721
+  CONFIGURE_COMMAND cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX} -DGTSAM_TYPEDEF_POINTS_TO_VECTORS=OFF -DGTSAM_BUILD_PYTHON=ON -DGTSAM_ALLOW_DEPRECATED_SINCE_V4=OFF -DGTSAM_INSTALL_MATLAB_TOOLBOX=${MATLAB_TOOLBOX} -DGTSAM_PYTHON_VERSION=3.8 -DMatlab_ROOT_DIR=${MATLAB_ROOT} -DGTSAM_WITH_EIGEN_MKL=OFF ../gtsam_src
+  BUILD_COMMAND make -j10
+  INSTALL_COMMAND make install && make python-install
+)
+
+#colcon_package(
+#  CFG_EXTRAS gtsam-extras.cmake)
+
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION "include/${PROJECT_NAME}"
+  FILES_MATCHING PATTERN "*.h"
+)
+
+install(DIRECTORY cmake/
+  DESTINATION "share/${PROJECT_NAME}"
+  FILES_MATCHING PATTERN "*.cmake"
+)

@@ -1,0 +1,54 @@
+# Python environments
+.venv
+*.pyc
+__pycache__/
+*.egg-info/
+
+# Build artifacts
+build/
+build_dry
+build_wet
+install/
+log/
+.cache/
+
+# Data and datasets
+data/
+dataset/
+
+*.md
+
+# Workspace-specific
+dry/.venv
+dry/build
+dry/install
+dry/log
+dry/data
+dry/.cache
+dry/*.md
+
+wet/.venv
+wet/build
+wet/install
+wet/log
+wet/data
+wet/.cache
+wet/*.md
+
+# KITTI sequence output folders
+wet/src/gmm_d2d_registration_examples/python/kitti_sequence_*/
+
+# Demo outputs - for now
+demo_results/
+demo_reconstruction.py
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# System files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,7 @@
+{
+  "name": "self_organizing_gmm",
+  "dependencies": {
+    "nanobind",
+    "nanoflann_colcon"
+  }
+}

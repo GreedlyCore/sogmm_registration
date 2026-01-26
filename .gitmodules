@@ -1,0 +1,48 @@
+[submodule "docs"]
+	path = docs
+	url = git@github.com:gira3d/gira3d-registration-docs.git
+[submodule "dry/src/dlib_colcon"]
+	path = dry/src/dlib_colcon
+	url = git@github.com:gira3d/dlib_colcon.git
+[submodule "dry/src/eigen_colcon"]
+	path = dry/src/eigen_colcon
+	url = git@github.com:gira3d/eigen_colcon.git
+[submodule "dry/src/gtsam_colcon"]
+	path = dry/src/gtsam_colcon
+	url = git@github.com:gira3d/gtsam_colcon.git
+[submodule "dry/src/mtimesx_colcon"]
+	path = dry/src/mtimesx_colcon
+	url = git@github.com:gira3d/mtimesx_colcon.git
+[submodule "dry/src/nanobind_colcon"]
+	path = dry/src/nanobind_colcon
+	url = git@github.com:wjakob/nanobind.git
+[submodule "dry/src/open3d_colcon"]
+	path = dry/src/open3d_colcon
+	url = git@github.com:gira3d/open3d_colcon.git
+[submodule "dry/src/nanoflann_colcon"]
+	path = dry/src/nanoflann_colcon
+	url = git@github.com:gira3d/nanoflann_colcon.git
+[submodule "wet/src/gmm"]
+	path = wet/src/gmm
+	url = git@github.com:gira3d/gmm.git
+[submodule "wet/src/gmm_d2d_registration"]
+	path = wet/src/gmm_d2d_registration
+	url = git@github.com:gira3d/gmm_d2d_registration.git
+[submodule "wet/src/gmm_d2d_registration_examples"]
+	path = wet/src/gmm_d2d_registration_examples
+	url = git@github.com:gira3d/gmm_d2d_registration_examples.git
+[submodule "wet/src/gmm_d2d_registration_matlab"]
+	path = wet/src/gmm_d2d_registration_matlab
+	url = git@github.com:gira3d/gmm_d2d_registration_matlab.git
+[submodule "wet/src/gmm_d2d_registration_py"]
+	path = wet/src/gmm_d2d_registration_py
+	url = git@github.com:gira3d/gmm_d2d_registration_py.git
+[submodule "wet/src/self_organizing_gmm"]
+	path = wet/src/self_organizing_gmm
+	url = git@github.com:gira3d/self_organizing_gmm.git
+[submodule "wet/src/sogmm_open3d"]
+	path = wet/src/sogmm_open3d
+	url = git@github.com:gira3d/sogmm_open3d.git
+[submodule "wet/src/sogmm_py"]
+	path = wet/src/sogmm_py
+	url = git@github.com:gira3d/sogmm_py.git

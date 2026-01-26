@@ -1,0 +1,74 @@
+cmake_minimum_required(VERSION 3.13)
+project(sogmm_open3d
+	VERSION 0.0.0
+	DESCRIPTION
+	"SOGMM Open3D"
+	LANGUAGES CXX C)
+
+# configuration
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# -Wno-enum-compare: suppress EigenRand + Eigen 3.4 enum mismatch warning in RandUtils.h
+set(CMAKE_CXX_FLAGS "-std=c++17 -march=native -O3 -fopenmp -Wno-enum-compare -ffast-math -fno-math-errno -mfma -funroll-loops -DNDEBUG -DEIGEN_NO_DEBUG")
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+
+# find dependencies
+find_package(Python 3.8 COMPONENTS Interpreter Development REQUIRED)
+find_package(nanobind CONFIG REQUIRED)
+find_package(Open3D REQUIRED)
+find_package(Eigen3 3.4 REQUIRED)
+find_package(self_organizing_gmm REQUIRED)
+find_package(nanoflann REQUIRED)
+find_package(CUDAToolkit REQUIRED)
+
+include(FetchContent)
+FetchContent_Declare(
+  EigenRand
+  GIT_REPOSITORY https://github.com/bab2min/EigenRand.git
+  GIT_TAG        v0.5.1
+)
+# Disable EigenRand tests and benchmarks
+set(EIGENRAND_BUILD_TEST OFF CACHE BOOL "" FORCE)
+set(EIGENRAND_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(EigenRand)
+
+# Setup nanobind modules
+nanobind_add_module(gmm_open3d_py src/nanobind/gmm_open3d_py.cpp)
+target_include_directories(gmm_open3d_py
+  PRIVATE
+  include
+  ${sogmm_INCLUDE_DIR}
+  ${EigenRand_SOURCE_DIR}
+  ${CUDAToolkit_INCLUDE_DIRS}
+)
+target_link_libraries(
+  gmm_open3d_py
+  PRIVATE Eigen3::Eigen
+  PRIVATE Open3D::Open3D
+)
+set_target_properties(gmm_open3d_py PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX})
+
+nanobind_add_module(sogmm_gpu src/nanobind/sogmm_gpu.cpp)
+target_include_directories(sogmm_gpu
+  PRIVATE
+  include
+  ${sogmm_INCLUDE_DIR}
+  ${EigenRand_SOURCE_DIR}
+  ${CUDAToolkit_INCLUDE_DIRS}
+)
+target_link_libraries(
+  sogmm_gpu
+  PRIVATE Eigen3::Eigen
+  PRIVATE Open3D::Open3D
+  PRIVATE nanoflann::nanoflann
+)
+set_target_properties(sogmm_gpu PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX})
+
+# Install
+install(TARGETS DESTINATION ${CMAKE_INSTALL_PREFIX})
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION "include/${PROJECT_NAME}"
+  FILES_MATCHING PATTERN "*.h"
+)

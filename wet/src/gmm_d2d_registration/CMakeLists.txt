@@ -1,0 +1,45 @@
+cmake_minimum_required(VERSION 3.13)
+
+project(gmm_d2d_registration
+	VERSION 0.0.0
+	DESCRIPTION
+	"GMM Registration"
+	LANGUAGES CXX C)
+
+find_package(dlib REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(gmm REQUIRED)
+find_package(OpenMP REQUIRED)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Intel MKL paths
+set(MKL_ROOT "/opt/intel/oneapi/mkl/latest")
+set(MKL_INCLUDE_DIR "${MKL_ROOT}/include")
+set(MKL_LIB_DIR "${MKL_ROOT}/lib")
+
+set(CMAKE_CXX_FLAGS "-O3 -march=native -ffast-math -fno-math-errno -mfma -fopenmp -funroll-loops -I${MKL_INCLUDE_DIR}")
+add_compile_definitions(NDEBUG EIGEN_NO_DEBUG EIGEN_USE_MKL_ALL MKL_LP64)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+
+# Link OpenMP and MKL for all targets in this project
+link_directories(${MKL_LIB_DIR})
+link_libraries(OpenMP::OpenMP_CXX mkl_gf_lp64 mkl_gnu_thread mkl_core gomp pthread m dl)
+
+find_package(Eigen3 REQUIRED)
+
+include_directories(include
+		    ${dlib_INCLUDE_DIR}
+		    ${gmm_INCLUDE_DIR}
+)
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION "include/${PROJECT_NAME}"
+)
+
+install(DIRECTORY cmake/
+  DESTINATION "share/${PROJECT_NAME}"
+  FILES_MATCHING PATTERN "*.cmake"
+)

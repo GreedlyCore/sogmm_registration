@@ -31,7 +31,7 @@ def voxel_filter(points, voxel_size=0.1, verbose=True):
     return filtered
 
 
-def radius_filter(points, radius=30.0, verbose=True):
+def radius_filter(points, min_radius=0.05, max_radius=30.0, verbose=True):
     """
     Remove points beyond specified radius from origin.
 
@@ -46,38 +46,17 @@ def radius_filter(points, radius=30.0, verbose=True):
         return points
 
     distances = np.linalg.norm(points[:, :3], axis=1)
-    mask = distances < radius
+    mask = (distances > min_radius) & (distances < max_radius)
     filtered = points[mask]
 
     if verbose:
-        print(f'Radius filter (<{radius}m): {len(points)} -> {len(filtered)} pts '
+        print(f'Radius filter ({min_radius}m < r < {max_radius}m): {len(points)} -> {len(filtered)} pts '
               f'({100.0 * len(filtered) / len(points):.1f}%)')
 
     return filtered
 
 
-def min_distance_filter(points, min_dist=1.0, verbose=False):
-    """
-    Remove points closer than min_dist from origin (sensor noise/vehicle).
 
-    Args:
-        points: Nx3 or Nx4 array of points
-        min_dist: Minimum distance (meters)
-
-    Returns:
-        Points beyond min_dist
-    """
-    if len(points) == 0:
-        return points
-
-    distances = np.linalg.norm(points[:, :3], axis=1)
-    mask = distances > min_dist
-    filtered = points[mask]
-
-    if verbose:
-        print(f'Min dist filter (>{min_dist}m): {len(points)} -> {len(filtered)} pts')
-
-    return filtered
 
 
 def every_n_filter(points, n=5, min_range=0.0, max_range=np.inf, verbose=True):

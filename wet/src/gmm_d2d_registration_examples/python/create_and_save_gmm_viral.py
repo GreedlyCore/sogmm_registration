@@ -15,34 +15,13 @@ from tqdm import tqdm
 from rosbags.rosbag1 import Reader
 from rosbags.typesys import Stores, get_typestore
 
-from utils.viral_loader import load_viral_lidar_config, apply_transform
-from utils.pcl_filters import voxel_filter, radius_filter, min_distance_filter, every_n_filter
+from utils.viral_loader import load_viral_lidar_config, apply_transform, pointcloud2_to_numpy
+from utils.pcl_filters import voxel_filter, radius_filter, every_n_filter
 from utils.save_gmm import save_sogmm
 
 from sogmm_py import SOGMM
 from gmm_py import GMMf4CPU
 from kinit_py import KInitf4CPU
-
-
-def pointcloud2_to_numpy(msg):
-    """
-    Convert ROS PointCloud2 message to numpy array.
-
-    Args:
-        msg: PointCloud2 message
-
-    Returns:
-        Nx4 array (x, y, z, intensity)
-    """
-    # VIRAL Ouster OS1 format: x, y, z, intensity, t, reflectivity, ring, ambient, range
-    dtype = np.dtype([
-        ('x', np.float32),
-        ('y', np.float32),
-        ('z', np.float32),
-        ('intensity', np.float32),
-    ])
-    points = np.frombuffer(msg.data, dtype=dtype)
-    return np.column_stack([points['x'], points['y'], points['z'], points['intensity']])
 
 
 def convert_viral_to_gmm(bag_path, output_dir, n_components=None,
@@ -51,8 +30,9 @@ def convert_viral_to_gmm(bag_path, output_dir, n_components=None,
                          use_voxel_filter=False, voxel_size=0.1,
                          use_radius_filter=False, radius=30.0,
                          use_every_n_filter=False, every_n=5,
-                         max_scans=None, skip_scans=10,
-                         implementation='fsogmm', bandwidth=None):
+                         max_scans=None, skip_scans=10, first_scan=0,
+                         implementation='fsogmm', bandwidth=None,
+                         mahal_distance=None, redux_kmeans=None):
     """
     Convert VIRAL rosbag point clouds to GMM format.
 
@@ -70,8 +50,11 @@ def convert_viral_to_gmm(bag_path, output_dir, n_components=None,
         every_n: Take every Nth point (reduces GMM init time)
         max_scans: Maximum number of scans to process
         skip_scans: Process every Nth scan
+        first_scan: First scan index to start processing from
         implementation: 'fsogmm' or 'sogmm'
         bandwidth: Bandwidth for SOGMM
+        mahal_distance: Mahalanobis distance bound for EM (None = disabled)
+        redux_kmeans: Use every Nth point for KMeans++ init only, then assign all points (None = disabled)
     """
     if implementation == 'fsogmm' and n_components is None:
         raise ValueError("fsogmm requires n_components parameter")
@@ -86,13 +69,15 @@ def convert_viral_to_gmm(bag_path, output_dir, n_components=None,
     print(f'Reading bag file: {bag_path}')
     print(f'LiDAR topic: {lidar_topic}')
     if implementation == 'sogmm':
-        print(f'Implementation: {implementation} (adaptive), bandwidth={bandwidth}')
+        print(f'Implementation: {implementation} , bandwidth={bandwidth}')
     else:
         print(f'Implementation: {implementation}, components={n_components}')
     print(f'Every-N filter: {use_every_n_filter} (every {every_n}th point)')
     print(f'Voxel filter: {use_voxel_filter} (size={voxel_size}m)')
     print(f'Radius filter: {use_radius_filter} (r={radius}m)')
-    print(f'Skip scans: {skip_scans}')
+    print(f'Skip scans: {skip_scans}, first_scan: {first_scan}')
+    print(f'Mahalanobis bound: {mahal_distance is not None} (λ={mahal_distance})')
+    print(f'Redux KMeans++: {redux_kmeans is not None} (every {redux_kmeans}th for init)')
 
     # Create output directory
     timestamp = datetime.now().strftime("%d%m%H%M")
@@ -119,6 +104,9 @@ def convert_viral_to_gmm(bag_path, output_dir, n_components=None,
         'radius_filter': use_radius_filter,
         'radius': radius,
         'skip_scans': skip_scans,
+        'first_scan': first_scan,
+        'mahal_distance': mahal_distance,
+        'redux_kmeans': redux_kmeans,
     }
     meta = {k: v for k, v in meta.items() if v is not None}
 
@@ -144,7 +132,10 @@ def convert_viral_to_gmm(bag_path, output_dir, n_components=None,
         print(f'\nProcessing point clouds from {lidar_topic}...')
 
         for connection, timestamp, rawdata in tqdm(reader.messages(connections=connections)):
-            if scan_idx % skip_scans != 0:
+            if scan_idx < first_scan:
+                scan_idx += 1
+                continue
+            if (scan_idx - first_scan) % skip_scans != 0:
                 scan_idx += 1
                 continue
 
@@ -153,43 +144,54 @@ def convert_viral_to_gmm(bag_path, output_dir, n_components=None,
 
             msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
             points_4d = pointcloud2_to_numpy(msg)
-
-            # Apply transform
+    
             points_4d = apply_transform(points_4d, T_body_lidar)
-
-            # Apply filters
+        
             if use_every_n_filter:
                 points_4d = every_n_filter(points_4d, n=every_n)
             if use_radius_filter:
-                points_4d = radius_filter(points_4d, radius)
+                min_radius, max_radius = 0.5, radius
+                points_4d = radius_filter(points_4d, min_radius, max_radius)
             if use_voxel_filter:
                 points_4d = voxel_filter(points_4d, voxel_size)
 
-            # Remove points too close (sensor)
-            points_4d = min_distance_filter(points_4d, min_dist=1.0)
-
             if len(points_4d) < 100:
-                print(f'\nWARNING: Scan {scan_idx} has only {len(points_4d)} points, skipping')
+                print(f'\nToo sparse: Scan {scan_idx} has only {len(points_4d)} points, skipping')
                 scan_idx += 1
                 continue
 
             if implementation == 'fsogmm' and len(points_4d) < n_components * 3:
-                print(f'\nWARNING: Scan {scan_idx} has only {len(points_4d)} points')
+                print(f'\nToo sparse: Scan {scan_idx} has only {len(points_4d)} points')
 
             # Fit GMM
             if implementation == 'fsogmm':
                 n_samples = points_4d.shape[0]
                 kinit = KInitf4CPU()
-                _, indices = kinit.resp_calc(points_4d, n_components)
-                resp = np.zeros((n_samples, n_components), dtype=np.float32)
-                resp[indices, np.arange(n_components)] = 1
+
+                if redux_kmeans is not None:
+                    # Redux: use subsampled points for KMeans++ init
+                    points_sub = points_4d[::redux_kmeans]
+                    centers, _ = kinit.resp_calc(points_sub, n_components)
+                    # Assign ALL points to nearest center
+                    dists = kinit.euclidean_dists(points_4d, centers)
+                    assignments = np.argmin(dists, axis=1)
+                    resp = np.zeros((n_samples, n_components), dtype=np.float32)
+                    resp[np.arange(n_samples), assignments] = 1
+                else:
+                    # Standard: KMeans++ on all points
+                    _, indices = kinit.resp_calc(points_4d, n_components)
+                    resp = np.zeros((n_samples, n_components), dtype=np.float32)
+                    resp[indices, np.arange(n_components)] = 1
 
                 stats_dir = os.path.join(gmm_output_dir, 'profiling')
                 os.makedirs(stats_dir, exist_ok=True)
                 stats_file = f'gmm_stats_scan_{saved_count:06d}.csv'
 
                 local_model = GMMf4CPU(n_components, True, stats_dir, stats_file)
-                success = local_model.fit(points_4d, resp)
+                if mahal_distance is not None:
+                    success = local_model.fit_mahal(points_4d, resp, mahal_distance)
+                else:
+                    success = local_model.fit(points_4d, resp)
 
                 if not success:
                     print(f'\nWARNING: EM fitting failed for scan {scan_idx}')
@@ -208,7 +210,7 @@ def convert_viral_to_gmm(bag_path, output_dir, n_components=None,
                 gmm_4d = local_model
 
             # Save GMM
-            output_path = os.path.join(gmm_output_dir, f'{saved_count}.gmm')
+            output_path = os.path.join(gmm_output_dir, f'{scan_idx}.gmm')
             save_sogmm(output_path, gmm_4d)
 
             saved_count += 1
@@ -242,8 +244,14 @@ def main():
                         help='Max distance from origin (default: 30.0)')
     parser.add_argument('--max_scans', type=int, default=None,
                         help='Maximum number of scans to process')
-    parser.add_argument('--skip_scans', type=int, default=10,
-                        help='Process every Nth scan (default: 10)')
+    parser.add_argument('--skip_scans', type=int, default=1,
+                        help='Process every Nth scan (default: 1)')
+    parser.add_argument('--first_scan', type=int, default=0,
+                        help='First scan index to start processing from (default: 0)')
+    parser.add_argument('--mahal_distance', type=float, default=None,
+                        help='Mahalanobis distance bound for EM (default: disabled)')
+    parser.add_argument('--redux_kmeans', type=int, default=None,
+                        help='Use every Nth point for KMeans++ init only (default: disabled)')
 
     args = parser.parse_args()
 
@@ -253,7 +261,7 @@ def main():
         sys.exit(1)
     elif args.bandwidth is not None:
         implementation = 'sogmm'
-        print(f'Using SOGMM (adaptive) with bandwidth={args.bandwidth}')
+        print(f'Using SOGMM  with bandwidth={args.bandwidth}')
     elif args.n_components is not None:
         implementation = 'fsogmm'
         print(f'Using fsogmm (fixed) with n_components={args.n_components}')
@@ -267,7 +275,7 @@ def main():
     if args.output_dir is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         bag_name = Path(args.bag).stem
-        args.output_dir = os.path.join(script_dir, f'viral_{bag_name}')
+        args.output_dir = os.path.join(script_dir, 'runs', f'viral_{bag_name}')
 
     # Load lidar config (topic + transform)
     config_topic, T_body_lidar = load_viral_lidar_config(args.bag)
@@ -290,8 +298,11 @@ def main():
         radius=args.radius,
         max_scans=args.max_scans,
         skip_scans=args.skip_scans,
+        first_scan=args.first_scan,
         implementation=implementation,
-        bandwidth=args.bandwidth
+        bandwidth=args.bandwidth,
+        mahal_distance=args.mahal_distance,
+        redux_kmeans=args.redux_kmeans
     )
 
 

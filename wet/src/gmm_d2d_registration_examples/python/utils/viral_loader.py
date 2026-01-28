@@ -69,6 +69,50 @@ def load_viral_lidar_config(bag_path, config_name='lidar_horz.yaml'):
     return topic, T_body_lidar
 
 
+VIRAL_OUSTER_DTYPE = np.dtype([
+    ('x', np.float32), ('y', np.float32), ('z', np.float32),
+    ('_pad1', np.float32), ('intensity', np.float32), ('t', np.uint32),
+    ('reflectivity', np.uint16), ('ring', np.uint8), ('_pad2', np.uint8),
+    ('ambient', np.uint16), ('_pad3', np.uint16), ('range', np.uint32),
+    ('_pad4', np.float32), ('_pad5', np.float32), ('_pad6', np.float32),
+])
+
+
+# def pointcloud2_to_numpy(msg):
+#     """Convert ROS PointCloud2 to Nx4 numpy array (x, y, z, intensity)."""
+#     points = np.frombuffer(msg.data, dtype=VIRAL_OUSTER_DTYPE)
+#     return np.column_stack([points['x'], points['y'], points['z'], points['intensity']])
+
+#TODO: viral datasets lidar is flipped in z: need to somehow generalize it 
+def pointcloud2_to_numpy(msg):
+    """Convert ROS PointCloud2 to Nx4 numpy array (x, y, z, intensity)."""
+    points = np.frombuffer(msg.data, dtype=VIRAL_OUSTER_DTYPE)
+    return np.column_stack([points['x'], points['y'], -points['z'], points['intensity']])
+
+
+def get_viral_scan_count(bag_path, lidar_topic='/os1_cloud_node1/points'):
+    """Return total number of scans in bag file."""
+    with Reader(bag_path) as reader:
+        connections = [c for c in reader.connections if c.topic == lidar_topic]
+        if not connections:
+            return 0
+        return sum(1 for _ in reader.messages(connections=connections))
+
+
+def load_viral_pointcloud(bag_path, scan_idx, lidar_topic='/os1_cloud_node1/points'):
+    """Load single pointcloud from VIRAL rosbag by index. Returns Nx4 array."""
+    typestore = get_typestore(Stores.ROS1_NOETIC)
+    with Reader(bag_path) as reader:
+        connections = [c for c in reader.connections if c.topic == lidar_topic]
+        if not connections:
+            raise ValueError(f'Topic {lidar_topic} not found in bag')
+        for i, (connection, timestamp, rawdata) in enumerate(reader.messages(connections=connections)):
+            if i == scan_idx:
+                msg = typestore.deserialize_ros1(rawdata, connection.msgtype)
+                return pointcloud2_to_numpy(msg)
+    raise IndexError(f'Scan index {scan_idx} out of range')
+
+
 def apply_transform(points_4d, T):
     """
     Apply 4x4 homogeneous transform to points (xyz only, preserve intensity).
@@ -138,7 +182,7 @@ def load_viral_gt_csv(sequence_name, gt_base_path=None):
         poses.append(T)
 
     print(f'Loaded {len(poses)} GT poses from CSV')
-    print(f'  Time range: {timestamps[0]:.3f}s to {timestamps[-1]:.3f}s')
+    print(f'  Time range: {timestamps[0]:.3f}s to {timestamps[-1]:.3f}s | delta= {timestamps[-1]-timestamps[0]:.3f}s')
 
     return timestamps, poses
 

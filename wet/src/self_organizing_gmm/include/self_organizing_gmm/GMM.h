@@ -326,6 +326,221 @@ public:
     }
   }
 
+  // Fit with optional Mahalanobis distance bound
+  // If mahal_distance > 0, enables bounded EM (only computes responsibilities
+  // for points within mahal_distance of each component)
+  inline bool fit(const MatrixXD& X, const Matrix& resp, T mahal_distance)
+  {
+    if (mahal_distance > 0)
+    {
+      use_mahal_bound_ = true;
+      mahal_threshold_sq_ = mahal_distance * mahal_distance;
+    }
+    else
+    {
+      use_mahal_bound_ = false;
+      mahal_threshold_sq_ = 0.0;
+    }
+
+    tp_.tic("fit");
+    unsigned int n_samples = X.rows();
+
+    if (n_samples <= 1)
+    {
+      throw std::runtime_error("fit: number of samples is " +
+                               std::to_string(n_samples) +
+                               ", it should be greater than 1.");
+    }
+
+    if (n_components_ <= 1)
+    {
+      throw std::runtime_error("fit: number of components is " +
+                               std::to_string(n_components_) +
+                               ", it should be greater than 1.");
+    }
+
+    auto gmm_model_params = estimateGaussianParameters(X, resp);
+    weights_ = std::get<0>(gmm_model_params);
+    means_ = std::get<1>(gmm_model_params);
+    covariances_ = std::get<2>(gmm_model_params);
+    precisions_cholesky_ = computeCholesky(covariances_);
+
+    // Compute Mahalanobis mask if using bounded EM
+    if (use_mahal_bound_)
+    {
+      computeMahalanobisMask(X, means_, precisions_cholesky_);
+    }
+
+    T lower_bound = -std::numeric_limits<T>::infinity();
+    for (unsigned int n_iter = 0; n_iter <= max_iter_; n_iter++)
+    {
+      T prev_lower_bound = lower_bound;
+
+      // E step (with or without Mahalanobis bound)
+      std::pair<T, Matrix> estep_output;
+      if (use_mahal_bound_)
+      {
+        estep_output = eStepMahalanobis(X);
+      }
+      else
+      {
+        estep_output = eStep(X);
+      }
+      T log_prob_norm = estep_output.first;
+      Matrix log_resp = estep_output.second;
+
+      // M step
+      mStep(X, log_resp);
+      lower_bound = log_prob_norm;
+
+      // convergence check
+      T change = lower_bound - prev_lower_bound;
+      dbg(n_iter, change);
+      if (!std::isinf(change) && std::abs(change) < tol_)
+      {
+        converged_ = true;
+        break;
+      }
+    }
+
+    tp_.toc("fit");
+    if (converged_)
+    {
+      support_size_ = n_samples;
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+
+  // Compute the Mahalanobis distance mask
+  // mahal_mask_(n, k) = true if point n is within threshold of component k
+  inline void computeMahalanobisMask(const MatrixXD& X,
+                                     const MatrixXD& means,
+                                     const MatrixXC& precs)
+  {
+    unsigned int n_samples = X.rows();
+    mahal_mask_ = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Constant(
+        n_samples, n_components_, false);
+
+    MatrixDD prec_chol = MatrixDD::Zero(D, D);
+    VectorC p_vec = VectorC::Zero(C, 1);
+
+    for (unsigned int k = 0; k < n_components_; ++k)
+    {
+      p_vec = precs.row(k);
+      prec_chol = Eigen::Map<MatrixDD>(p_vec.data(), D, D);
+
+      // Compute squared Mahalanobis distance: ||L^{-1}(x - mu)||^2
+      Matrix y = (X * prec_chol).rowwise() - (means.row(k) * prec_chol);
+      Vector mahal_dist_sq = y.array().square().rowwise().sum();
+
+      for (unsigned int n = 0; n < n_samples; ++n)
+      {
+        if (mahal_dist_sq(n) <= mahal_threshold_sq_)
+        {
+          mahal_mask_(n, k) = true;
+        }
+      }
+    }
+  }
+
+  // E-step with Mahalanobis distance bound
+  inline std::pair<T, Matrix> eStepMahalanobis(const MatrixXD& X)
+  {
+    tp_.tic("eStep");
+    auto log_prob_resp = estimateLogProbRespMahalanobis(X);
+    tp_.toc("eStep");
+    return std::make_pair(log_prob_resp.first.array().mean(),
+                          log_prob_resp.second);
+  }
+
+  // Estimate log probability and responsibilities with Mahalanobis mask
+  inline std::pair<Vector, Matrix> estimateLogProbRespMahalanobis(const MatrixXD& X)
+  {
+    unsigned int n_samples = X.rows();
+
+    // Compute log Gaussian probability with mask
+    Matrix log_gauss_prob = estimateLogGaussianProbMahalanobis(X, means_, precisions_cholesky_);
+
+    // Add log weights
+    Matrix weighted_log_prob = log_gauss_prob.array().rowwise() +
+                               weights_.transpose().array().log();
+
+    // Compute normalization with logsumexp (only for masked entries)
+    Vector log_prob_norm = Vector::Zero(n_samples);
+    for (unsigned int n = 0; n < n_samples; ++n)
+    {
+      T max_val = -std::numeric_limits<T>::infinity();
+      for (unsigned int k = 0; k < n_components_; ++k)
+      {
+        if (mahal_mask_(n, k) && weighted_log_prob(n, k) > max_val)
+          max_val = weighted_log_prob(n, k);
+      }
+
+      T sum_exp = 0.0;
+      for (unsigned int k = 0; k < n_components_; ++k)
+      {
+        if (mahal_mask_(n, k))
+          sum_exp += std::exp(weighted_log_prob(n, k) - max_val);
+      }
+      log_prob_norm(n) = max_val + std::log(sum_exp + std::numeric_limits<T>::min());
+    }
+
+    // Compute log responsibilities
+    Matrix log_resp = Matrix::Constant(n_samples, n_components_,
+                                       -std::numeric_limits<T>::infinity());
+    for (unsigned int n = 0; n < n_samples; ++n)
+    {
+      for (unsigned int k = 0; k < n_components_; ++k)
+      {
+        if (mahal_mask_(n, k))
+        {
+          log_resp(n, k) = weighted_log_prob(n, k) - log_prob_norm(n);
+        }
+      }
+    }
+
+    return std::make_pair(log_prob_norm, log_resp);
+  }
+
+  // Estimate log Gaussian probability with Mahalanobis mask
+  // Returns -inf for masked-out (point, component) pairs
+  inline Matrix estimateLogGaussianProbMahalanobis(const MatrixXD& X,
+                                                    const MatrixXD& means,
+                                                    const MatrixXC& precisions_chol)
+  {
+    unsigned int n_samples = X.rows();
+
+    Vector log_det = computeLogDetCholesky(precisions_chol);
+    Matrix log_prob = Matrix::Constant(n_samples, n_components_,
+                                       -std::numeric_limits<T>::infinity());
+
+    MatrixDD prec_chol = MatrixDD::Zero(D, D);
+    VectorC p = VectorC::Zero(C, 1);
+
+    for (unsigned int k = 0; k < n_components_; ++k)
+    {
+      p = precisions_chol.row(k);
+      prec_chol = Eigen::Map<MatrixDD>(p.data(), D, D);
+
+      Matrix y = (X * prec_chol).rowwise() - (means.row(k) * prec_chol);
+      Vector mahal_sq = y.array().square().rowwise().sum();
+
+      for (unsigned int n = 0; n < n_samples; ++n)
+      {
+        if (mahal_mask_(n, k))
+        {
+          log_prob(n, k) = -0.5 * (D * LOG_2_M_PI + mahal_sq(n)) + log_det(k);
+        }
+      }
+    }
+
+    return log_prob;
+  }
+
   // Box-Muller method sampling of Gaussian distributions
   inline MatrixXD sample(const unsigned int& n_samples, double sigma = 3.0)
   {
@@ -529,8 +744,14 @@ public:
   // Getters for compatibility with gmm_d2d_registration
   unsigned int getNClusters() const { return n_components_; }
   const Vector& getWeights() const { return weights_; }
-  const MatrixXC& getCovs() const { return covariances_; }
-  const MatrixXD& getMeans() const { return means_; }
+  // const MatrixXC& getCovs() const { return covariances_; }
+  // const MatrixXD& getMeans() const { return means_; }
+
+  // TODO: Temp solution - D2D registration expects column-major (D,K) layout
+  // but GMM stores row-major (K,D). Returning transposed copies for now.
+  // Consider refactoring D2D code or storage layout for proper fix.
+  Eigen::Matrix<T, C, Eigen::Dynamic> getCovs() const { return covariances_.transpose(); }
+  Eigen::Matrix<T, D, Eigen::Dynamic> getMeans() const { return means_.transpose(); }
 
   // Modify covariances to be isoplanar (flatten them)
   void makeCovsIsoplanar()
@@ -663,4 +884,9 @@ public:
   // for python bindings/debugging
   Matrix resp_;
   TimeProfiler tp_;
+
+  // Mahalanobis distance bound members
+  T mahal_threshold_sq_ = 0.0;
+  bool use_mahal_bound_ = false;
+  Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> mahal_mask_;
 };

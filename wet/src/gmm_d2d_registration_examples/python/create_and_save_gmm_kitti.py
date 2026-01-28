@@ -13,7 +13,7 @@ import yaml
 from tqdm import tqdm
 
 from utils.kitti_loader import load_kitti_velodyne
-from utils.pcl_filters import voxel_filter, radius_filter, min_distance_filter, remove_plane_ransac, every_n_filter
+from utils.pcl_filters import voxel_filter, radius_filter, remove_plane_ransac, every_n_filter
 from utils.save_gmm import save_sogmm
 
 from sogmm_py import SOGMM
@@ -27,7 +27,7 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, sequence, n_components=None,
                          use_plane_removal=False, ransac_distance=0.3, ransac_iters=1000,
                          use_every_n_filter=False, every_n=5,
                          start_idx=0, end_idx=None, implementation='fsogmm',
-                         bandwidth=None):
+                         bandwidth=None, mahal_distance=None, redux_kmeans=None):
     """
     Convert KITTI velodyne scans to GMM format.
 
@@ -49,6 +49,8 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, sequence, n_components=None,
         end_idx: Last scan index to process (None = all)
         implementation: 'fsogmm' or 'sogmm'
         bandwidth: Bandwidth for SOGMM
+        mahal_distance: Mahalanobis distance bound for EM (None = disabled)
+        redux_kmeans: Use every Nth point for KMeans++ init only, then assign all points (None = disabled)
     """
     if implementation == 'fsogmm' and n_components is None:
         raise ValueError("fsogmm requires n_components parameter")
@@ -70,13 +72,15 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, sequence, n_components=None,
     # Print config
     print(f'Converting {len(bin_files)} scans to GMM format...')
     if implementation == 'sogmm':
-        print(f'Implementation: {implementation} (adaptive), bandwidth={bandwidth}')
+        print(f'Implementation: {implementation} , bandwidth={bandwidth}')
     else:
         print(f'Implementation: {implementation}, components={n_components}')
     print(f'Every-N filter: {use_every_n_filter} (every {every_n}th point)')
     print(f'Voxel filter: {use_voxel_filter} (size={voxel_size}m)')
     print(f'Radius filter: {use_radius_filter} (r={radius}m)')
     print(f'Plane removal: {use_plane_removal} (dist={ransac_distance}m, iters={ransac_iters})')
+    print(f'Mahalanobis bound: {mahal_distance is not None} (λ={mahal_distance})')
+    print(f'Redux KMeans++: {redux_kmeans is not None} (every {redux_kmeans}th for init)')
 
     # Create output directory
     timestamp = datetime.now().strftime("%d%m%H%M")
@@ -102,6 +106,8 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, sequence, n_components=None,
         'plane_removal': use_plane_removal,
         'ransac_distance': ransac_distance,
         'ransac_iters': ransac_iters,
+        'mahal_distance': mahal_distance,
+        'redux_kmeans': redux_kmeans,
         'start_idx': start_idx,
         'end_idx': end_idx,
         'n_scans': len(bin_files),
@@ -121,14 +127,14 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, sequence, n_components=None,
         if use_every_n_filter:
             points_4d = every_n_filter(points_4d, n=every_n)
         if use_radius_filter:
-            points_4d = radius_filter(points_4d, radius)
+            min_radius, max_radius = 0.5, radius
+            points_4d = radius_filter(points_4d, min_radius, max_radius)
         if use_voxel_filter:
             points_4d = voxel_filter(points_4d, voxel_size)
         if use_plane_removal:
             points_4d = remove_plane_ransac(points_4d, ransac_distance, 3, ransac_iters)
 
-        # Remove points too close (vehicle)
-        points_4d = min_distance_filter(points_4d, min_dist=2.0)
+        
 
         if implementation == 'fsogmm' and len(points_4d) < n_components * 3:
             print(f'\nWARNING: {bin_file} has only {len(points_4d)} points')
@@ -137,16 +143,31 @@ def convert_kitti_to_gmm(sequence_dir, output_dir, sequence, n_components=None,
         if implementation == 'fsogmm':
             n_samples = points_4d.shape[0]
             kinit = KInitf4CPU()
-            _, indices = kinit.resp_calc(points_4d, n_components)
-            resp = np.zeros((n_samples, n_components), dtype=np.float32)
-            resp[indices, np.arange(n_components)] = 1
+
+            if redux_kmeans is not None:
+                # Redux: use subsampled points for KMeans++ init
+                points_sub = points_4d[::redux_kmeans]
+                centers, _ = kinit.resp_calc(points_sub, n_components)
+                # Assign ALL points to nearest center
+                dists = kinit.euclidean_dists(points_4d, centers)
+                assignments = np.argmin(dists, axis=1)
+                resp = np.zeros((n_samples, n_components), dtype=np.float32)
+                resp[np.arange(n_samples), assignments] = 1
+            else:
+                # Standard: KMeans++ on all points
+                _, indices = kinit.resp_calc(points_4d, n_components)
+                resp = np.zeros((n_samples, n_components), dtype=np.float32)
+                resp[indices, np.arange(n_components)] = 1
 
             stats_dir = os.path.join(gmm_output_dir, 'profiling')
             os.makedirs(stats_dir, exist_ok=True)
             stats_file = f'gmm_stats_{bin_file.split(".")[0]}.csv'
 
             local_model = GMMf4CPU(n_components, True, stats_dir, stats_file)
-            success = local_model.fit(points_4d, resp)
+            if mahal_distance is not None:
+                success = local_model.fit_mahal(points_4d, resp, mahal_distance)
+            else:
+                success = local_model.fit(points_4d, resp)
 
             if not success:
                 print(f'WARNING: EM fitting failed for {bin_file}')
@@ -204,6 +225,10 @@ def main():
                         help='RANSAC iterations (default: 1000)')
     parser.add_argument('--start_idx', type=int, default=0,
                         help='First scan index (default: 0)')
+    parser.add_argument('--mahal_distance', type=float, default=None,
+                        help='Mahalanobis distance bound for EM (default: disabled)')
+    parser.add_argument('--redux_kmeans', type=int, default=None,
+                        help='Use every Nth point for KMeans++ init only (default: disabled)')
 
     args = parser.parse_args()
 
@@ -234,7 +259,7 @@ def main():
 
     if args.output_dir is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        args.output_dir = os.path.join(script_dir, f'kitti_sequence_{args.sequence}')
+        args.output_dir = os.path.join(script_dir, 'runs', f'kitti_sequence_{args.sequence}')
 
     if not os.path.exists(sequence_dir):
         print(f'ERROR: Sequence directory not found: {sequence_dir}')
@@ -243,7 +268,7 @@ def main():
     end_idx = args.start_idx + args.n_scans
 
     print(f'KITTI Sequence: {args.sequence}')
-    print(f'Sequence dir: {sequence_dir}')
+    # print(f'Sequence dir: {sequence_dir}')
     print(f'Output dir: {args.output_dir}')
     print(f'Scans: {args.start_idx} to {end_idx-1} ({args.n_scans} total)\n')
 
@@ -264,7 +289,9 @@ def main():
         start_idx=args.start_idx,
         end_idx=end_idx,
         implementation=implementation,
-        bandwidth=args.bandwidth
+        bandwidth=args.bandwidth,
+        mahal_distance=args.mahal_distance,
+        redux_kmeans=args.redux_kmeans
     )
 
 

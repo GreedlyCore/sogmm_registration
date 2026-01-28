@@ -4,14 +4,12 @@ Run GMM D2D registration on LiDAR datasets (KITTI, VIRAL, etc.)
 """
 import os
 import sys
-import glob
 import argparse
 import pickle
 import time
 import json
 
 import numpy as np
-import yaml
 from tqdm import tqdm
 
 import gmm_d2d_registration_py
@@ -19,64 +17,9 @@ from utils.RToZYX import RToZYX
 from utils.pose_compose import pose_compose
 from utils.pose_inverse import pose_inverse
 from utils.plot_results import plot_results
+from utils.gmm_folder import parse_meta_file, detect_gmm_range
 from utils.kitti_loader import load_kitti_ground_truth, load_kitti_calib
 from utils.viral_loader import load_viral_ground_truth, load_viral_lidar_config
-
-
-def find_gmm_dir(base_dir, pattern, timestamp=None):
-    """
-    Find GMM directory, checking for exact match first, then timestamped versions.
-
-    Args:
-        base_dir: Base directory to search in
-        pattern: Pattern to match (e.g., '100_components' or 'adaptive_bw10_components')
-        timestamp: Specific timestamp suffix. If None, uses most recent.
-
-    Returns:
-        Path to GMM directory
-    """
-    if timestamp:
-        return os.path.join(base_dir, f'{pattern}_{timestamp}')
-
-    exact_path = os.path.join(base_dir, pattern)
-    if os.path.exists(exact_path):
-        return exact_path
-
-    candidates = glob.glob(os.path.join(base_dir, f'{pattern}_*'))
-    if candidates:
-        candidates.sort(key=os.path.getmtime, reverse=True)
-        return candidates[0]
-
-    return exact_path
-
-
-def parse_meta_file(gmm_folder):
-    """
-    Parse meta.yaml from GMM folder to extract dataset configuration.
-
-    Returns:
-        dict with keys: dataset, sequence (kitti), bag_file (viral), skip_scans (viral)
-    """
-    meta_path = os.path.join(gmm_folder, 'meta.yaml')
-    config = {}
-
-    if os.path.exists(meta_path):
-        with open(meta_path, 'r') as f:
-            config = yaml.safe_load(f) or {}
-
-    # Infer dataset from parent folder if not in meta.yaml
-    if 'dataset' not in config:
-        parent_folder = os.path.basename(os.path.dirname(gmm_folder))
-        if parent_folder.startswith('kitti_'):
-            config['dataset'] = 'KITTI'
-            parts = parent_folder.split('_')
-            if len(parts) >= 3:
-                config['sequence'] = parts[-1]
-        elif parent_folder.startswith('viral_'):
-            config['dataset'] = 'VIRAL'
-            config['bag_file'] = '_'.join(parent_folder.split('_')[1:])
-
-    return config
 
 
 def compute_relative_transform(pose_i, pose_i1, Tr=None):
@@ -154,16 +97,14 @@ def run_gmm_odometry(gmm_folder, first_scan, last_scan,
         if viral_dir is None:
             viral_dir = os.path.join(repo_dataset_dir, 'viral')
         viral_bag = os.path.join(viral_dir, bag_name, f'{bag_name}.bag')
-        viral_skip_scans = meta.get('skip_scans', 10)
+        viral_skip_scans = meta.get('skip_scans', 1)  # default: no skipping
     else:
         raise ValueError(f'Unknown dataset: {dataset}')
 
-    # Load ground truth
-    print(f'Dataset: {dataset.upper()}')
+    # print(f'Dataset: {dataset.upper()}')
     print(f'GMM folder: {gmm_folder}')
-
-    Tr = None  # Calibration matrix (KITTI only)
-
+    Tr = None
+    
     if dataset == 'kitti':
         poses, Tr = load_kitti_ground_truth(
             kitti_sequence, kitti_dir, start_idx=first_scan, end_idx=last_scan
@@ -176,10 +117,19 @@ def run_gmm_odometry(gmm_folder, first_scan, last_scan,
             viral_bag, lidar_topic=lidar_topic,
             skip_scans=viral_skip_scans, max_scans=last_scan + 1
         )
-        poses = poses[first_scan:last_scan + 1]
+        # Slice poses using indices adjusted for skip_scans
+        pose_start = first_scan // viral_skip_scans
+        pose_end = (last_scan // viral_skip_scans) + 1
+        poses = poses[pose_start:pose_end]
+
+    # Calculate number of pairs based on dataset
+    if dataset == 'viral':
+        n_pairs = (last_scan - first_scan) // viral_skip_scans
+    else:
+        n_pairs = last_scan - first_scan
 
     print(f'Scans: {first_scan} to {last_scan}')
-    print(f'Total pairs: {last_scan - first_scan}')
+    print(f'Total pairs: {n_pairs}')
     print()
 
     # Create results directory
@@ -187,7 +137,6 @@ def run_gmm_odometry(gmm_folder, first_scan, last_scan,
     os.makedirs(results_dir, exist_ok=True)
 
     # Initialize arrays
-    n_pairs = last_scan - first_scan
     transforms = np.zeros((n_pairs, 6))
     ground_truths = np.zeros((n_pairs, 6))
     errors = np.zeros((n_pairs, 6))
@@ -212,11 +161,14 @@ def run_gmm_odometry(gmm_folder, first_scan, last_scan,
             source_file = os.path.join(gmm_folder, f'{scan_i + 1}.gmm')
             target_file = os.path.join(gmm_folder, f'{scan_i + 2}.gmm')
         else:
-            source_file = os.path.join(gmm_folder, f'{scan_i}.gmm')
-            target_file = os.path.join(gmm_folder, f'{scan_i + 1}.gmm')
-
+            # VIRAL: GMM files are spaced by skip_scans (e.g., 200, 210, 220...)
+            gmm_scan_i = first_scan + i * viral_skip_scans
+            source_file = os.path.join(gmm_folder, f'{gmm_scan_i}.gmm')
+            target_file = os.path.join(gmm_folder, f'{gmm_scan_i + viral_skip_scans}.gmm')                                                                                                                                                                      
+  
         if not os.path.exists(source_file) or not os.path.exists(target_file):
-            print(f'\nWARNING: Missing GMM files for scan {scan_i}')
+            gmm_idx = gmm_scan_i if dataset == 'viral' else scan_i
+            print(f'\nWARNING: Missing GMM files for scan {gmm_idx}')
             continue
 
         # Run registration
@@ -238,6 +190,10 @@ def run_gmm_odometry(gmm_folder, first_scan, last_scan,
         rotation = Tout[0:3, 0:3]
         translation = Tout[0:3, 3]
         dpose = np.concatenate([translation, RToZYX(rotation)])
+        
+        # numpy.set_printoptions(formatter={'float': lambda x: f"{x:10.4g}"})
+        np.set_printoptions(precision=3)
+        print(dpose)
 
         # Compute ground truth transformation
         pose_i = poses[i]
@@ -310,10 +266,10 @@ def main():
 
     parser.add_argument('--gmm_folder', type=str, required=True,
                         help='Path to folder containing .gmm files')
-    parser.add_argument('--first_scan', type=int, default=0,
-                        help='First scan index (default: 0)')
-    parser.add_argument('--last_scan', type=int, default=100,
-                        help='Last scan index (default: 100)')
+    parser.add_argument('--first_scan', type=int, default=None,
+                        help='First scan index (default: auto-detect from folder)')
+    parser.add_argument('--last_scan', type=int, default=None,
+                        help='Last scan index (default: auto-detect from folder)')
     parser.add_argument('--profile', action='store_true',
                         help='Enable profiling')
     parser.add_argument('--kitti_dir', type=str, default=None,
@@ -323,10 +279,23 @@ def main():
 
     args = parser.parse_args()
 
+    # Auto-detect scan range if not provided
+    first_scan = args.first_scan
+    last_scan = args.last_scan
+
+    if first_scan is None or last_scan is None:
+        detected_first, detected_last, detected_skip = detect_gmm_range(args.gmm_folder)
+        if detected_first is None:
+            raise ValueError(f'No .gmm files found in {args.gmm_folder}')
+
+        first_scan = first_scan if first_scan is not None else detected_first
+        last_scan = last_scan if last_scan is not None else detected_last
+        print(f'Auto-detected scan range: {first_scan} to {last_scan} (step={detected_skip})')
+
     run_gmm_odometry(
         gmm_folder=args.gmm_folder,
-        first_scan=args.first_scan,
-        last_scan=args.last_scan,
+        first_scan=first_scan,
+        last_scan=last_scan,
         kitti_dir=args.kitti_dir,
         viral_dir=args.viral_dir,
         enable_profiling=args.profile

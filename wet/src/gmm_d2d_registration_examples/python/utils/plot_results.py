@@ -12,16 +12,18 @@ def plot_results(transforms, ground_truths, FIRST_SCAN, LAST_SCAN, save_path=Non
     Tgmm = [np.eye(4)]
     Tgt = [np.eye(4)]
 
-    for i in range(FIRST_SCAN, LAST_SCAN):
+    # Use actual array size (handles skip_scans for VIRAL dataset)
+    n_pairs = transforms.shape[0]
+    for i in range(n_pairs):
         T = np.eye(4)
-        T[0:3, 0:3] = ZYXToR(transforms[i-FIRST_SCAN, 3:6])
-        T[0:3, 3] = np.transpose(transforms[i-FIRST_SCAN, 0:3])
+        T[0:3, 0:3] = ZYXToR(transforms[i, 3:6])
+        T[0:3, 3] = np.transpose(transforms[i, 0:3])
         T2 = pose_compose(Tgmm[-1], T)
         Tgmm.append(T2)
 
         T = np.eye(4)
-        T[0:3, 0:3] = ZYXToR(ground_truths[i-FIRST_SCAN, 3:6])
-        T[0:3, 3] = np.transpose(ground_truths[i-FIRST_SCAN, 0:3])
+        T[0:3, 0:3] = ZYXToR(ground_truths[i, 3:6])
+        T[0:3, 3] = np.transpose(ground_truths[i, 0:3])
         T2 = pose_compose(Tgt[-1], T)
         Tgt.append(T2)
 

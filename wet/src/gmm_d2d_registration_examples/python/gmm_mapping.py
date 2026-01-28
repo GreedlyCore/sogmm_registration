@@ -1,12 +1,6 @@
 #!/usr/bin/env python
 """
-GMM-based mapping with GTSAM pose graph optimization.
-
-This script:
-1. Loads registration results (or runs registration)
-2. Builds a pose graph using GTSAM iSAM2
-3. Transforms GMMs to world frame
-4. Saves map data for visualization
+Mapping with GTSAM pose graph (do not tested, deprecated) #TODO: remove?
 """
 import os
 import numpy as np
@@ -180,7 +174,7 @@ def main():
 
     # Find paths
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    sequence_dir = os.path.join(script_dir, f'kitti_sequence_{args.sequence}')
+    sequence_dir = os.path.join(script_dir, 'runs', f'kitti_sequence_{args.sequence}')
     results_dir = os.path.join(sequence_dir, 'results')
 
     # Find results file

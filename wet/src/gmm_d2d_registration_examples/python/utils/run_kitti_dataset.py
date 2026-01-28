@@ -52,7 +52,7 @@ def run_kitti_dataset(sequence, first_scan, last_scan, num_components,
 
     # GMM files are stored in kitti_sequence_{ID} directory (created by create_and_save_gmm_kitti.py)
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    sequence_gmm_dir = os.path.join(script_dir, f'kitti_sequence_{sequence}')
+    sequence_gmm_dir = os.path.join(script_dir, 'runs', f'kitti_sequence_{sequence}')
 
     def find_gmm_dir(base_dir, pattern, timestamp=None):
         """Find GMM directory, checking for exact match first, then timestamped versions.

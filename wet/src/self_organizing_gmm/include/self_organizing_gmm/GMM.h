@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <memory>
 #include <random>
 
@@ -556,34 +557,56 @@ public:
     precisions_cholesky_ = computeCholesky(covariances_);
   }
 
-  // Load GMM from file (simple binary format)
+  // Load GMM from CSV file 
+  // Format: mean_x, mean_y, mean_z, cov_00..cov_22 (9 values), weight
   void load(const std::string& filename)
   {
-    std::ifstream file(filename, std::ios::binary);
+    std::ifstream file(filename);
     if (!file.is_open())
     {
       throw std::runtime_error("Cannot open file: " + filename);
     }
 
-    // Read n_components
-    file.read(reinterpret_cast<char*>(&n_components_), sizeof(n_components_));
+    // Count lines to determine n_components
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(file, line))
+    {
+      if (!line.empty()) lines.push_back(line);
+    }
+    n_components_ = lines.size();
 
-    // Resize matrices
+    // Resize all matrices
     weights_.resize(n_components_);
     means_.resize(n_components_, D);
     covariances_.resize(n_components_, C);
+    covariances_cholesky_.resize(n_components_, C);
+    precisions_cholesky_.resize(n_components_, C);
 
-    // Read weights
-    file.read(reinterpret_cast<char*>(weights_.data()),
-              n_components_ * sizeof(T));
+    // Parse each line
+    for (unsigned int k = 0; k < n_components_; k++)
+    {
+      std::stringstream ss(lines[k]);
+      std::string token;
 
-    // Read means
-    file.read(reinterpret_cast<char*>(means_.data()),
-              n_components_ * D * sizeof(T));
+      // Read means (3 values)
+      for (unsigned int d = 0; d < D; d++)
+      {
+        std::getline(ss, token, ',');
+        means_(k, d) = static_cast<T>(std::stod(token));
+      }
 
-    // Read covariances
-    file.read(reinterpret_cast<char*>(covariances_.data()),
-              n_components_ * C * sizeof(T));
+      // Read covariances (9 values)
+      for (unsigned int c = 0; c < C; c++)
+      {
+        std::getline(ss, token, ',');
+        covariances_(k, c) = static_cast<T>(std::stod(token));
+      }
+
+      // Read weight (1 value)
+      std::getline(ss, token, ',');
+      weights_(k) = static_cast<T>(std::stod(token));
+    }
 
     file.close();
 

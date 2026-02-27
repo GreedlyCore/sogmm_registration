@@ -76,6 +76,17 @@ namespace sogmm
                           nb::dynamic_attr())
           .def(nb::init(), "Default empty constructor.")
           .def(nb::init<const float &>(), "Initialize using the bandwidth parameter")
+          .def("__init__", [](Learner *self, const float &bandwidth, const std::string &kernel) {
+                 sogmm::KernelType kt;
+                 if (kernel == "flat" || kernel == "uniform")   kt = sogmm::KernelType::FLAT;
+                 else if (kernel == "gaussian")                  kt = sogmm::KernelType::GAUSSIAN;
+                 else if (kernel == "cauchy")                    kt = sogmm::KernelType::CAUCHY;
+                 else if (kernel == "logistic")                  kt = sogmm::KernelType::LOGISTIC;
+                 else if (kernel == "epanechnikov")              kt = sogmm::KernelType::EPANECHNIKOV;
+                 else throw std::invalid_argument("Unknown kernel: " + kernel);
+                 new (self) Learner(bandwidth, kt);
+               }, nb::arg("bandwidth"), nb::arg("kernel") = "flat",
+               "Initialize using bandwidth and kernel type string.")
           .def("fit", &Learner::fit)
           .def("fit_em", &Learner::fit_em);
     }

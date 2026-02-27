@@ -35,13 +35,20 @@ wet/*.md
 
 # iridescence file, idl
 wet/src/gmm_d2d_registration_examples/python/imgui.ini
-wet/src/gmm_d2d_registration_examples/runs/
-# Other repos
-puma/
+wet/src/gmm_d2d_registration_examples/python/runs/
+
+# Claude AI assistant files
+.claude/
+
+# Experiment run output directories
+wet/src/gmm_d2d_registration_examples/python/*_components_*/
+
+# Reconstruction outputs
+reconstruction/
+
 
 # Demo outputs - for now
 demo_results/
-demo_reconstruction.py
 
 # IDE and editor files
 .vscode/

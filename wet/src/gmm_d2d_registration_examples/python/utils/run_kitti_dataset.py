@@ -307,9 +307,9 @@ def main():
                        help='Last scan index (default: 100)')
     parser.add_argument('--num_components', type=int, default=100,
                        help='Number of GMM components (default: 100). Use -1 for adaptive mode.')
-    parser.add_argument('--bandwidth', type=float, default=None,
+    parser.add_argument('--bw', type=float, default=None,
                        help='Bandwidth value for adaptive mode (e.g., 0.1, 0.8, 1.0). '
-                            'If provided, uses adaptive_bw{bandwidth*100}_components folder.')
+                            'If provided, uses adaptive_bw{bw*100}_components folder.')
     parser.add_argument('--kitti_dir', type=str,
                        default='./dataset/kitti',
                        help='Path to KITTI dataset root')
@@ -329,7 +329,7 @@ def main():
         num_components=args.num_components,
         kitti_dir=args.kitti_dir,
         enable_profiling=args.profile,
-        bandwidth=args.bandwidth,
+        bandwidth=args.bw,
         timestamp=args.timestamp
     )
 

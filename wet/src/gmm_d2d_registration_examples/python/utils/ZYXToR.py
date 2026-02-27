@@ -12,9 +12,9 @@ def ZYXToR(angles):
         print('np.shape(angles) must equal 3')
         return np.eye(3)
 
-    phi = ang[0]
-    theta = ang[1]
-    psi = ang[2]
+    phi = ang[0] # alpha
+    theta = ang[1] # beta
+    psi = ang[2] # gamma
 
     rot = np.eye(3)
     rot[0, 0] = cos(theta)*cos(psi)

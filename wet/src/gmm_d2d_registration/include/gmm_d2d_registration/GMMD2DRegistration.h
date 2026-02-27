@@ -1,11 +1,10 @@
-// The contents of this file are in the public domain. See LICENSE_FOR_EXAMPLE_PROGRAMS.txt
 /*
     GMM Distribution-to-Distribution (D2D) Registration
 
     Aligns two Gaussian Mixture Models (GMMs) by finding the optimal rigid transformation
     (rotation + translation) that minimizes a probabilistic distance measure.
 
-    Based on: "On-Manifold GMM Registration"
+    Origannly code and idea took from on: "On-Manifold GMM Registration"
 
     Key concept: Instead of aligning individual points, this aligns probability distributions
     represented as GMMs. Each GMM is a weighted sum of 3D Gaussian components.
@@ -26,8 +25,6 @@ using namespace dlib;
 #define NUM_DIMS 3
 
 // ----------------------------------------------------------------------------------------
-// OPTIMIZATION VECTOR STRUCTURE
-//
 // Dlib optimizers work by adjusting a vector of parameters to minimize a cost function.
 // For 3D rigid transformation, we need 6 parameters:
 //
@@ -37,7 +34,6 @@ using namespace dlib;
 //   x[3:5] = u1, u2, u3  → Rotation as axis-angle representation
 //                          (axis direction = normalized [u1,u2,u3], angle = ||u||)
 //
-//dlib optimizes 6 elements vector
 // ----------------------------------------------------------------------------------------
 typedef matrix<float,0,1> column_vector;
 
@@ -153,9 +149,6 @@ public:
     // Input:  x = [tx, ty, tz, u1, u2, u3] - current transformation
     // Output: der = 6x1 gradient vector (how cost changes with each parameter)
     //         hess = 6x6 Hessian matrix (second derivatives, curvature info)
-    //
-    // The optimizer uses these to converge faster (2nd-order Newton-type method).
-    // Gradient tells "which way is downhill", Hessian tells "how steep is the slope".
     void get_derivative_and_hessian (
         const column_vector& x,
         column_vector& der,
@@ -200,9 +193,7 @@ private:
   const GMM<float, 3> & target_gmm_;
   float Et_;
 
-  // corr_grad_hess(): Core GMM alignment computation
-  //
-  // This is where the actual GMM-to-GMM distance is computed, following the paper's math.
+  // GMM-to-GMM distance is computed, following the paper's math closed loop solution
   //
   // The algorithm loops over all pairs of Gaussian components (one from each GMM):
   //   - For each pair (m, k): compute how much they "overlap" after transformation
@@ -224,14 +215,10 @@ private:
   //   J: Jacobian (gradient) - 6x1 vector
   //   H: Hessian - 6x6 matrix
   void corr_grad_hess(const Eigen::Matrix3f& Ri, const Eigen::Vector3f& ti,
-                      const uint32_t& Nm,
-                      const uint32_t& Nk,
-                      const Eigen::MatrixXf& wm,
-                      const Eigen::MatrixXf& wk,
-                      const Eigen::MatrixXf& Lm,
-                      const Eigen::MatrixXf& Omk,
-                      const Eigen::MatrixXf& mu_m,
-                      const Eigen::MatrixXf& nu_k,
+                      const uint32_t& Nm, const uint32_t& Nk,
+                      const Eigen::MatrixXf& wm, const Eigen::MatrixXf& wk,
+                      const Eigen::MatrixXf& Lm, const Eigen::MatrixXf& Omk,
+                      const Eigen::MatrixXf& mu_m, const Eigen::MatrixXf& nu_k,
                       const float& Et,
                       const std::vector<Eigen::Matrix3f>& dRdu,
                       const std::vector<std::vector<Eigen::Matrix3f> >& d2Rdu2,
@@ -251,14 +238,12 @@ private:
     Delta.setZero(); Gamma.setZero();
     Htr.setZero();
 
-    // Main loop: iterate over all pairs of Gaussian components (m from target, k from source)
-    // Nmk = Nm * Nk total pairs
+    // Iterate over all pairs (Nmk) of Gaussian components (m from target, k from source)
     //
     // OpenMP parallelization with thread-local accumulators:
     // - Each thread accumulates into private variables (no contention)
     // - After loop: combine thread-local results into global variables
-    // - Speedup: 4-8× on multi-core CPUs for large GMMs
-    #pragma omp parallel if(Nmk > 25)
+    #pragma omp parallel if(Nmk > 400)
     {
       // Thread-local accumulators (each thread gets its own copy)
       float score_local = 0;
@@ -314,7 +299,7 @@ private:
       Smkid.computeInverseAndDetWithCheck(Smkd, detd, invertible, 1e-30);
       if (!invertible)
       {
-      // Matrix not invertible - use SVD-based pseudo-inverse
+      // Matrix not invertible --> use SVD-based pseudo-inverse
       Smkid = Smkd.inverse();
       // std::cout << "Smkid: " << Smkid << std::endl;
       // std::cout << "Smk: " << Smk << std::endl;
@@ -414,7 +399,7 @@ private:
           Gamma_local.block<3, 3>(3*ix, 0) += fmk * (-SmkROmi.transpose() + (Sy_ytSROmi + Synut_mk).transpose());  // Thread-local
         }
       }
-      }  // End of parallel for loop
+      } 
 
       // Reduction: Combine thread-local accumulators into global variables
       // Use atomic/critical sections only ONCE per thread (not per iteration!)
@@ -462,9 +447,7 @@ private:
   // These derivatives are needed for the chain rule when computing gradient/Hessian
   // of the cost function with respect to the rotation parameters.
   //
-  // The math here is analytically derived (likely using symbolic math tools) from the
-  // Rodrigues rotation formula: R = I + sin(θ)[u]× + (1-cos(θ))[u]×²
-  // where θ = ||u|| and [u]× is the skew-symmetric matrix of u.
+  // The math here is analytically derived 
 
   inline void partial_wrt_u(const float& u1, const float& u2,
                             const float& u3, std::vector<Eigen::Matrix3f>& J) const
@@ -939,7 +922,9 @@ public:
   // The optimization starts from Tinit and iteratively improves it until convergence.
   float match(const GMM<float, 3>& source_gmm, const GMM<float, 3>& target_gmm,
              const Eigen::Transform<float,3,Eigen::Affine,Eigen::ColMajor>& Tinit,
-             Eigen::Transform<float,3,Eigen::Affine,Eigen::ColMajor>& Tout)
+             Eigen::Transform<float,3,Eigen::Affine,Eigen::ColMajor>& Tout,
+             float radius = 5.0f,
+             float min_delta = 1e-7f)
   {
     // STEP 1: Convert initial transformation from matrix to 6-parameter vector
     // Tinit (4x4 matrix) → x = [tx, ty, tz, u1, u2, u3] (6-element vector)
@@ -951,16 +936,13 @@ public:
 
     Eigen::Matrix<float, 1,6> tmp;
     tmp << t(0), t(1), t(2), u(0), u(1), u(2);
-    //std::cout << "Initializing with " << tmp << std::endl;
 
-    // STEP 2: Run trust-region optimization (dlib's powerful 2nd-order optimizer)
-    // This iteratively adjusts x to minimize the GMM alignment cost
-    // Uses gradient + Hessian for fast convergence
+    // STEP 2: Run trust-region optimization (dlib 2nd-order optimizer)
     float min = find_max_trust_region(
-                                objective_delta_stop_strategy(1e-7),  // Stop when improvement < 1e-7
-                                gmm_registration_model(source_gmm, target_gmm),  // Cost function
-                                x,   // Starting point (will be modified to optimal solution)
-                                5.0); // Initial trust region radius
+                                objective_delta_stop_strategy(min_delta),
+                                gmm_registration_model(source_gmm, target_gmm),
+                                x,
+                                radius);
 
     // STEP 3: Convert optimized 6-parameter vector back to 4x4 transformation matrix
     u = Eigen::Vector3f(x(3), x(4), x(5));  // Extract optimized rotation

@@ -20,6 +20,10 @@ def save_sogmm(filepath, gmm_4d):
 
     means_3d = gmm_4d.means_[:, :3]
     covs_4d = gmm_4d.covariances_.reshape(n_components, 4, 4)
+    
+    # print(covs_4d.shape)
+    # print(covs_4d)
+    
     covs_3d = covs_4d[:, :3, :3]
 
     for i in range(n_components):

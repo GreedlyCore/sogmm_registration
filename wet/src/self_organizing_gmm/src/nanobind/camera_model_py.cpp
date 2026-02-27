@@ -1,6 +1,8 @@
 #include <self_organizing_gmm/CameraModel.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/eigen/dense.h>
+#include <nanobind/stl/pair.h>
+#include <nanobind/stl/vector.h>
 
 namespace nb = nanobind;
 

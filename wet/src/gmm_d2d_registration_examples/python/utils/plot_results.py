@@ -33,14 +33,28 @@ def plot_results(transforms, ground_truths, FIRST_SCAN, LAST_SCAN, save_path=Non
         xyz_gmm[i, :] = np.transpose(Tgmm[i][0:3, 3])
         xyz_gt[i, :] = np.transpose(Tgt[i][0:3, 3])
 
-    ax = plt.figure().add_subplot(projection='3d')
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-    ax.plot(xyz_gmm[:, 0], xyz_gmm[:, 1],
-            xyz_gmm[:, 2], label='GMM D2D Registration')
-    ax.plot(xyz_gt[:, 0], xyz_gt[:, 1], xyz_gt[:, 2], label='Ground Truth')
+    # XY top-down view
+    axes[0].plot(xyz_gmm[:, 0], xyz_gmm[:, 1], label='GMM D2D Registration')
+    axes[0].plot(xyz_gt[:, 0],  xyz_gt[:, 1],  label='Ground Truth')
+    axes[0].set_xlabel('X (m)')
+    axes[0].set_ylabel('Y (m)')
+    axes[0].set_title('Top-down (XY)')
+    axes[0].set_aspect('equal')
+    axes[0].legend()
 
-    ax.set_aspect('equal', 'box')
-    ax.legend()
+    # 3D view — no forced equal aspect so both trajectories are always visible
+    ax3 = fig.add_subplot(1, 2, 2, projection='3d')
+    ax3.plot(xyz_gmm[:, 0], xyz_gmm[:, 1], xyz_gmm[:, 2], label='GMM D2D Registration')
+    ax3.plot(xyz_gt[:, 0],  xyz_gt[:, 1],  xyz_gt[:, 2],  label='Ground Truth')
+    ax3.set_xlabel('X')
+    ax3.set_ylabel('Y')
+    ax3.set_zlabel('Z')
+    ax3.set_title('3D view')
+    ax3.legend()
+
+    plt.tight_layout()
 
     if save_path is not None:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')

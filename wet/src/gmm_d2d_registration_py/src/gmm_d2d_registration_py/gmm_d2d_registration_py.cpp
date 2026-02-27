@@ -15,7 +15,9 @@ using namespace nb::literals;
 
 std::pair<Eigen::Matrix<float, 4, 4>, float> anisotropic_registration(const Eigen::Matrix<float, 4, 4>Tin,
 								      const std::string& source_file,
-								      const std::string& target_file)
+								      const std::string& target_file,
+								      float radius = 5.0f,
+								      float min_delta = 1e-7f)
 {
   Eigen::Transform<float, 3, Eigen::Affine, Eigen::ColMajor> Tout;
   Eigen::Transform<float, 3, Eigen::Affine, Eigen::ColMajor> Tinit =
@@ -28,7 +30,7 @@ std::pair<Eigen::Matrix<float, 4, 4>, float> anisotropic_registration(const Eige
   target_gmm.load(target_file);
 
   MatcherD2D matcher;
-  float score = matcher.match(source_gmm, target_gmm, Tinit, Tout);
+  float score = matcher.match(source_gmm, target_gmm, Tinit, Tout, radius, min_delta);
 
   Eigen::Matrix<float, 4, 4> T = Tout.matrix();
   return std::pair<Eigen::Matrix<float, 4, 4>, float> (T, score);
@@ -36,7 +38,9 @@ std::pair<Eigen::Matrix<float, 4, 4>, float> anisotropic_registration(const Eige
 
 std::pair<Eigen::Matrix<float, 4, 4>, float> isoplanar_registration(const Eigen::Matrix<float, 4, 4>Tin,
 								    const std::string& source_file,
-								    const std::string& target_file)
+								    const std::string& target_file,
+								    float radius = 5.0f,
+								    float min_delta = 1e-7f)
 {
   Eigen::Transform<float, 3, Eigen::Affine, Eigen::ColMajor> Tout;
   Eigen::Transform<float, 3, Eigen::Affine, Eigen::ColMajor> Tinit =
@@ -51,15 +55,19 @@ std::pair<Eigen::Matrix<float, 4, 4>, float> isoplanar_registration(const Eigen:
   target_gmm.makeCovsIsoplanar();
 
   MatcherD2D matcher;
-  float score = matcher.match(source_gmm, target_gmm, Tinit, Tout);
+  float score = matcher.match(source_gmm, target_gmm, Tinit, Tout, radius, min_delta);
 
   Eigen::Matrix<float, 4, 4> T = Tout.matrix();
   return std::pair<Eigen::Matrix<float, 4, 4>, float> (T, score);
 }
 
 NB_MODULE(gmm_d2d_registration_py, m) {
-  m.def("anisotropic_registration", &anisotropic_registration);
-  m.def("isoplanar_registration", &isoplanar_registration);
+  m.def("anisotropic_registration", &anisotropic_registration,
+        "Tin"_a, "source_file"_a, "target_file"_a,
+        "radius"_a = 5.0f, "min_delta"_a = 1e-7f);
+  m.def("isoplanar_registration", &isoplanar_registration,
+        "Tin"_a, "source_file"_a, "target_file"_a,
+        "radius"_a = 5.0f, "min_delta"_a = 1e-7f);
 
 
 

@@ -155,7 +155,7 @@ def main():
                             'If not provided, searches in kitti_sequence_{seq}/results/')
     parser.add_argument('--gmm_dir', type=str, default=None,
                        help='Path to GMM directory. If not provided, uses most recent.')
-    parser.add_argument('--bandwidth', type=float, default=None,
+    parser.add_argument('--bw', type=float, default=None,
                        help='Bandwidth value to find adaptive GMM folder')
     parser.add_argument('--timestamp', type=str, default=None,
                        help='Specific timestamp suffix for GMM folder')
@@ -192,8 +192,8 @@ def main():
     # Find GMM directory
     if args.gmm_dir is None:
         import glob
-        if args.bandwidth is not None:
-            bw_value = int(args.bandwidth * 100)
+        if args.bw is not None:
+            bw_value = int(args.bw * 100)
             pattern = f'adaptive_bw{bw_value}_components'
         else:
             pattern = '*_components'

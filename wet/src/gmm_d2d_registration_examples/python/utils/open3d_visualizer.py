@@ -48,8 +48,17 @@ def create_ellipsoid_mesh(mean, covariance, weight, n_sigma=3, resolution=20):
     Returns:
         Open3D TriangleMesh of the ellipsoid
     """
+    # Cast to float64 for numerical stability (float32 EM can leave near-singular covs)
+    covariance = covariance.astype(np.float64)
+
+    if not np.all(np.isfinite(covariance)):
+        return None, weight
+
     # Eigenvalue decomposition to get principal axes and scales
-    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    try:
+        eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    except np.linalg.LinAlgError:
+        return None, weight
 
     # Ensure eigenvalues are positive (numerical stability)
     eigenvalues = np.maximum(eigenvalues, 1e-6)
@@ -323,15 +332,21 @@ class InteractiveEllipsoidVisualizer():
 
         # Create ellipsoid meshes for all components
         meshes_with_weights = []
+        skipped = 0
         for i in range(gmm_data['n_components']):
             mesh, weight = create_ellipsoid_mesh(
                 gmm_data['means'][i],
                 gmm_data['covariances'][i],
                 gmm_data['weights'][i],
-                n_sigma=2, 
+                n_sigma=2,
                 resolution=20
             )
+            if mesh is None:
+                skipped += 1
+                continue
             meshes_with_weights.append((mesh, weight))
+        if skipped:
+            print(f"  ({skipped} degenerate components skipped)")
 
         return meshes_with_weights
 

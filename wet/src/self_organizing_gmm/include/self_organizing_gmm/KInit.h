@@ -14,7 +14,7 @@ namespace sogmm
   /// @brief Class to compute initial responsibility matrix for EM.
   /// @details For initial responsibilities, we use the steps 1a -- 1c of the
   /// algorithm from: Arthur, D. and Vassilvitskii, S.  "k-means++: the
-  /// advantages ofcareful seeding". ACM-SIAM symposium on Discrete algorithms.
+  /// advantages of careful seeding". ACM-SIAM symposium on Discrete algorithms.
   /// 2007
   /// @author Kshitij Goel
   /// @tparam T Datatype (e.g., float, double)
@@ -279,7 +279,10 @@ namespace sogmm
       }
     }
 
-    std::default_random_engine generator_;
+    // std::default_random_engine generator_;  // fixed seed == 1 is used (deterministic)
+    // TODO: check efficiency of execution on different platforms (x86 / ARM) 
+    // https://stackoverflow.com/questions/39288595/why-not-just-use-stdrandom-device
+    std::default_random_engine generator_{std::random_device{}()}; // 
     std::uniform_int_distribution<int> int_dist_;
   };
 }

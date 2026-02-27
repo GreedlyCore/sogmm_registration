@@ -109,6 +109,41 @@ def every_n_filter(points, n=5, min_range=0.0, max_range=np.inf, verbose=True):
     return filtered
 
 
+def mahal_filter(points, threshold=3.0, verbose=True):
+    """
+    Remove statistical outliers using Mahalanobis distance from point cloud centroid.
+
+    Args:
+        points: Nx3 or Nx4 array
+        threshold: Mahalanobis distance threshold (keep d < threshold)
+
+    Returns:
+        Filtered points
+    """
+    if len(points) < 10:
+        return points
+
+    xyz = points[:, :3].astype(np.float64)
+    mean = np.mean(xyz, axis=0)
+    cov = np.cov(xyz.T) + np.eye(3) * 1e-6
+
+    try:
+        cov_inv = np.linalg.inv(cov)
+    except np.linalg.LinAlgError:
+        return points
+
+    diff = xyz - mean
+    mahal_sq = np.einsum('ij,jk,ik->i', diff, cov_inv, diff)
+    mask = mahal_sq < threshold ** 2
+    filtered = points[mask]
+
+    if verbose:
+        print(f'Mahal filter (d<{threshold:.1f}): {len(points)} -> {len(filtered)} pts '
+              f'({100.0 * len(filtered) / len(points):.1f}%)')
+
+    return filtered
+
+
 def remove_plane_ransac(points, distance_threshold=0.3, ransac_n=3,
                         num_iterations=1000, verbose=True):
     """

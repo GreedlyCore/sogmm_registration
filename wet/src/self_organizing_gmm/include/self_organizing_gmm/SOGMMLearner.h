@@ -36,6 +36,13 @@ namespace sogmm
         em_ = std::make_shared<EM<T, 4>>();
       }
 
+      SOGMMLearner(const float &bandwidth, KernelType kernel_type)
+      {
+        ms_ = std::make_shared<MeanShift2D>(bandwidth, kernel_type);
+        kinit_ = std::make_shared<KInit<T, 4>>();
+        em_ = std::make_shared<EM<T, 4>>();
+      }
+
       void fit(const MatrixX2 &Y, const MatrixX4 &X, Container &sogmm)
       {
         if (Y.rows() != X.rows())

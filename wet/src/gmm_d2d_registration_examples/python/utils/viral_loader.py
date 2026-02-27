@@ -188,8 +188,8 @@ def load_viral_gt_csv(sequence_name, gt_base_path=None):
 
 
 def load_viral_ground_truth(bag_path, lidar_topic='/os1_cloud_node1/points',
-                            skip_scans=1, max_scans=None, gt_base_path=None,
-                            max_time_diff=0.05):
+                            skip_scans=1, first_scan=0, max_scans=None,
+                            gt_base_path=None, max_time_diff=0.05):
     """
     Load ground truth poses from NTU VIRAL CSV, aligned with lidar scans from bag.
 
@@ -197,6 +197,7 @@ def load_viral_ground_truth(bag_path, lidar_topic='/os1_cloud_node1/points',
         bag_path: Path to .bag file (for lidar timestamps)
         lidar_topic: LiDAR topic to get scan timestamps
         skip_scans: Process every Nth scan (must match GMM generation)
+        first_scan: First scan index to start from (must match GMM generation)
         max_scans: Maximum number of scans (must match GMM generation)
         gt_base_path: Path to ntuviral_gt folder
         max_time_diff: Maximum time difference for matching (seconds)
@@ -227,7 +228,10 @@ def load_viral_ground_truth(bag_path, lidar_topic='/os1_cloud_node1/points',
             raise ValueError(f'Topic {lidar_topic} not found in bag')
 
         for connection, timestamp, rawdata in reader.messages(connections=connections):
-            if scan_idx % skip_scans != 0:
+            if scan_idx < first_scan:
+                scan_idx += 1
+                continue
+            if (scan_idx - first_scan) % skip_scans != 0:
                 scan_idx += 1
                 continue
             if max_scans is not None and saved_count >= max_scans:

@@ -15,11 +15,11 @@ namespace sogmm
   /// @brief Kernel types for Mean Shift
   enum class KernelType
   {
-    FLAT,      // Uniform kernel (default)
-    GAUSSIAN,  // Gaussian kernel
-    CAUCHY,    // Cauchy kernel
-    LOGISTIC,   // Logistic kernel
-    EPANECHNIKOV // Epanechnikov kernel (optimal for MSE)
+    FLAT,     
+    GAUSSIAN, 
+    CAUCHY,   
+    LOGISTIC, 
+    EPANECHNIKOV 
   };
 
   /// @brief A class to run Gaussian Blurring Mean Shift (GBMS) on 2D data.

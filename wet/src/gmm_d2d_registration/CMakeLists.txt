@@ -45,3 +45,6 @@ install(DIRECTORY cmake/
 	DESTINATION "share/${PROJECT_NAME}"
 	FILES_MATCHING PATTERN "*.cmake"
 )
+
+add_executable(test_partial_wrt_u test/test_partial_wrt_u.cpp)
+target_link_libraries(test_partial_wrt_u Eigen3::Eigen)

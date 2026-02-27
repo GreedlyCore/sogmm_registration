@@ -1,5 +1,0 @@
-{
-  "name": "open3d_colcon",
-  "dependencies": { "eigen_colcon", "pybind11_colcon" },
-  "hooks": []
-}

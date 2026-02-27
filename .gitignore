@@ -17,6 +17,7 @@ dataset/
 *.md
 
 # Workspace-specific
+dry/src/open3d_colcon/
 dry/.venv
 dry/build
 dry/install

@@ -21,7 +21,7 @@ DATASET = 'mine_001_part3'
 # OE    rotation    : 13.076585 deg  (0.228229 rad)
 
 # From proposed paper: FIRST_SCAN = 0 && LAST_SCAN = 320
-# python3 run_mine_dataset.py --gmm_dir /home/sonieth2/thesis/gira3d-registration/data/mine_001_part3/100_components
+# python3 run_mine_dataset.py --gmm_dir /home/sonieth2/thesis/sogmm_registration/data/mine_001_part3/100_components
 
 # return a first/last scan choice 
 

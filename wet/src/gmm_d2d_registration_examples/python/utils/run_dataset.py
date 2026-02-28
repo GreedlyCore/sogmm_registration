@@ -60,7 +60,7 @@ def _gmm_pca_init(source_file, target_file):
 def run_dataset(DATASET, FIRST_SCAN, LAST_SCAN, PREFIX, NUM_COMPONENTS, GMM_DIR=None, init_method='com'):
 
     cwd = os.getcwd()
-    SANDBOX_NAME = 'gira3d-registration'
+    SANDBOX_NAME = 'sogmm_registration'
     matches = cwd.split(SANDBOX_NAME)
     GIRA3D_REGISTRATION_SANDBOX = matches[0] + SANDBOX_NAME
     DATA_DIR = GIRA3D_REGISTRATION_SANDBOX + '/data/' + DATASET + '/'

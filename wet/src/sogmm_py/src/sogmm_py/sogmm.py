@@ -71,7 +71,7 @@ class SOGMM(object):
         self.stats_dir = stats_dir
         self.stats_file_prefix = stats_file_prefix
 
-    def fit(self, pcld):
+    def fit(self, pcld, mahal_distance=None):
         """Fit SOGMM over a 4-D point cloud.
 
         PRI/MeanShift is used to decide number of components for the input point cloud.
@@ -104,9 +104,9 @@ class SOGMM(object):
         ms.fit(ms_data)
         n_components = ms.get_num_modes()
 
-        return self.gmm_fit(pcld, n_components)
+        return self.gmm_fit(pcld, n_components, mahal_distance)
 
-    def gmm_fit(self, pcld, n_components):
+    def gmm_fit(self, pcld, n_components, mahal_distance=None):
         """Fit a GMM model with the passed number of components and update the model.
 
         Parameters
@@ -137,11 +137,11 @@ class SOGMM(object):
                 local_model = GMMf4CPU(n_components, self.save_stats, self.stats_dir, gmm_stats_file)
             else:
                 local_model = GMMf4CPU(n_components)
-            success = local_model.fit(pcld, resp)
+            success = local_model.fit_mahal(pcld, resp, mahal_distance) if mahal_distance is not None else local_model.fit(pcld, resp)
         elif self.compute == 'GPU':
             # print('Compute platform is GPU')
             local_model = GMMf4GPU(n_components, n_samples)
-            success = local_model.fit(pcld, resp)
+            success = local_model.fit_mahal(pcld, resp, mahal_distance) if mahal_distance is not None else local_model.fit(pcld, resp)
         else:
             print('No compute platform specified, running on the CPU')
             if self.save_stats and self.stats_dir and self.stats_file_prefix:
@@ -149,7 +149,7 @@ class SOGMM(object):
                 local_model = GMMf4CPU(n_components, self.save_stats, self.stats_dir, gmm_stats_file)
             else:
                 local_model = GMMf4CPU(n_components)
-            success = local_model.fit(pcld, resp)
+            success = local_model.fit_mahal(pcld, resp, mahal_distance) if mahal_distance is not None else local_model.fit(pcld, resp)
 
         if success:
             self.latest_model = local_model

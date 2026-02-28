@@ -50,6 +50,9 @@ then
 
   source ../.venv/bin/activate
 
+  # Get nanobind cmake dir from the active Python environment
+  NANOBIND_DIR=$(python3 -c "import nanobind; print(nanobind.cmake_dir())")
+
   # Make sure dry workspace is sourced first
   source workon
 
@@ -65,10 +68,10 @@ then
   # Build with colcon
   if [[ $SAFE == true ]]; then
     echo "Building in safe mode (single-threaded)..."
-    colcon build --parallel-workers 1 --executor sequential --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX}
+    colcon build --parallel-workers 1 --executor sequential --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX} -Dnanobind_DIR=${NANOBIND_DIR}
   else
     echo "Building in parallel mode..."
-    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX}
+    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX} -Dnanobind_DIR=${NANOBIND_DIR}
   fi
 
   cd ..

@@ -36,7 +36,7 @@ import sogmm_cpu
 python3 create_and_save_sogmm_fixed.py --dataset cave --n_components 100 --every-n 5 --radius 15 --start_idx 499 --end_idx 890
 
 
-python3 run_cave_dataset.py /home/sonieth2/thesis/gira3d-registration/wet/src/gmm_d2d_registration_examples/python/runs/cave/100_components_24022157
+python3 run_cave_dataset.py /home/sonieth2/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/runs/cave/100_components_24022157
 """
 
 def main():

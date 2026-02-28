@@ -90,8 +90,8 @@ _CANDIDATES = [
     os.path.join(_SCRIPT_DIR, 'wet/build/gmm_d2d_registration/test_partial_wrt_u'),
     os.path.join(_BUILD_DIR,  'test_partial_wrt_u'),
     # colcon install path
-    os.path.expanduser('~/thesis/gira3d-registration/wet/build/gmm_d2d_registration/test_partial_wrt_u'),
-    os.path.expanduser('~/thesis/gira3d-registration/wet/install/gmm_d2d_registration/lib/gmm_d2d_registration/test_partial_wrt_u'),
+    os.path.expanduser('~/thesis/sogmm_registration/wet/build/gmm_d2d_registration/test_partial_wrt_u'),
+    os.path.expanduser('~/thesis/sogmm_registration/wet/install/gmm_d2d_registration/lib/gmm_d2d_registration/test_partial_wrt_u'),
 ]
 CPP_BIN = None
 for c in _CANDIDATES:

@@ -148,7 +148,7 @@ def main():
 
     parser.add_argument('--dataset', type=str,
                         default='rgbd_dataset_freiburg3_long_office_household',
-                        help='TUM dataset folder name under gira3d-registration/data/')
+                        help='TUM dataset folder name under sogmm_registration/data/')
     parser.add_argument('--n_components', type=int, default=None)
     parser.add_argument('--bw',          type=float, default=None,
                         help='Bandwidth for SOGMM')
@@ -165,7 +165,7 @@ def main():
     implementation, bandwidth, n_components = detect_implementation(args.bw, args.n_components)
 
     cwd = os.getcwd()
-    SANDBOX_NAME = 'gira3d-registration'
+    SANDBOX_NAME = 'sogmm_registration'
     gira3d_root  = cwd.split(SANDBOX_NAME)[0] + SANDBOX_NAME
 
     pcld_dir   = os.path.join(gira3d_root, 'data', args.dataset, 'pointclouds')

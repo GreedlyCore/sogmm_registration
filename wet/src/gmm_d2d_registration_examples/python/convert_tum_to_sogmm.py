@@ -8,7 +8,7 @@ Depth→3D back-projection uses camera intrinsics read from the bag.
 RGB lookup uses TF chain: depth_optical → camera → rgb_optical.
 
 Output path default:
-  gira3d-registration/data/{bag_name}/pointclouds/{depth_idx}.txt
+  sogmm_registration/data/{bag_name}/pointclouds/{depth_idx}.txt
 
 Usage:
     python convert_tum_to_sogmm.py --bag ~/thesis/mai_city/bags/rgbd_dataset_freiburg3_long_office_household.bag
@@ -320,7 +320,7 @@ def main():
     parser.add_argument('--bag', type=str, required=True,
                         help='Path to .bag file')
     parser.add_argument('--output_dir', type=str, default=None,
-                        help='Output dir (default: gira3d-registration/data/{bag_name}/pointclouds/)')
+                        help='Output dir (default: sogmm_registration/data/{bag_name}/pointclouds/)')
     parser.add_argument('--start-id',  type=int, default=None, dest='start_id')
     parser.add_argument('--final-id',  type=int, default=None, dest='final_id')
     parser.add_argument('--skip-scans', type=int, default=1,   dest='skip_scans')

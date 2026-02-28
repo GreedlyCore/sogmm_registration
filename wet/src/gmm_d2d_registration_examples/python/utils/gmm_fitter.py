@@ -44,6 +44,8 @@ def fit_gmm(points_4d, implementation, n_components=None, bandwidth=None,
         os.makedirs(stats_dir, exist_ok=True)
 
     if implementation == 'fixed':
+        if points_4d.shape[1] == 3:
+            points_4d = np.hstack([points_4d, np.zeros((points_4d.shape[0], 1), dtype=np.float32)])
         n_samples = points_4d.shape[0]
         kinit = KInitf4CPU()
 
@@ -69,4 +71,4 @@ def fit_gmm(points_4d, implementation, n_components=None, bandwidth=None,
 
     elif implementation == 'sogmm':
         sg = SOGMM(bandwidth, save_stats=True, stats_dir=stats_dir, stats_file_prefix=scan_name)
-        return sg.fit(points_4d)
+        return sg.fit(points_4d, mahal_distance=mahal_distance)

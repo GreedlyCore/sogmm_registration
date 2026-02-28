@@ -7,7 +7,7 @@ from utils.save_gmm import save
 def create_and_save_gmm_example():
     
     cwd = os.getcwd()
-    SANDBOX_NAME = 'gira3d-registration'
+    SANDBOX_NAME = 'sogmm_registration'
     matches = cwd.split(SANDBOX_NAME)
     GIRA3D_REGISTRATION_SANDBOX = matches[0] + SANDBOX_NAME
     PCLD_DIR = GIRA3D_REGISTRATION_SANDBOX + '/data/rgbd_dataset_freiburg3_long_office_household/pointclouds/'

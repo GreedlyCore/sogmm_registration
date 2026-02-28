@@ -35,6 +35,14 @@ find_package(nanobind CONFIG REQUIRED)
 find_package(Eigen3 3.4 REQUIRED)
 find_package(nanoflann REQUIRED)
 
+# Intel MKL as Eigen backend -- disabled: MKL hurts performance for small matrices (3x3 GMM covariances)
+# set(MKL_ROOT "/opt/intel/oneapi/mkl/latest")
+# set(MKL_INCLUDE_DIR "${MKL_ROOT}/include")
+# set(MKL_LIB_DIR "${MKL_ROOT}/lib/intel64")
+# include_directories(${MKL_INCLUDE_DIR})
+# link_directories(${MKL_LIB_DIR})
+# add_compile_definitions(EIGEN_USE_MKL_ALL MKL_LP64)
+
 include(FetchContent)
 FetchContent_Declare(
   EigenRand

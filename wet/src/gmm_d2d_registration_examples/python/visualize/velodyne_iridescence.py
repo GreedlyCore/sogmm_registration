@@ -1,17 +1,18 @@
 #!/usr/bin/env python
 """Point cloud visualizer using iridescence. Supports KITTI and VIRAL datasets."""
 import os
+import sys
 import glob
 import argparse
 import numpy as np
 from pyridescence import guik, imgui
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '../../../../../'))
+sys.path.insert(0, os.path.join(SCRIPT_DIR, '..'))
 from utils.kitti_loader import load_kitti_velodyne
 from utils.viral_loader import load_viral_pointcloud, get_viral_scan_count
 from utils.pcl_filters import voxel_filter, radius_filter, remove_plane_ransac
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '../../../../'))
 
 DATASET_CONFIG = {
     'kitti': {

@@ -13,9 +13,9 @@
 # [submodule "dry/src/mtimesx_colcon"]
 # 	path = dry/src/mtimesx_colcon
 # 	url = git@github.com:gira3d/mtimesx_colcon.git
-[submodule "dry/src/nanobind_colcon"]
-	path = dry/src/nanobind_colcon
-	url = git@github.com:wjakob/nanobind.git
+# [submodule "dry/src/nanobind_colcon"]
+# 	path = dry/src/nanobind_colcon
+# 	url = git@github.com:wjakob/nanobind.git
 # [submodule "dry/src/open3d_colcon"]
 # 	path = dry/src/open3d_colcon
 # 	url = git@github.com:gira3d/open3d_colcon.git

@@ -24,8 +24,8 @@ from utils.gmm_fitter import fit_gmm, make_output_dir, detect_implementation
 
 
 #   take those sequences from viral dataset runs:\
-#   python visualize_viral_gt.py --dataset nya_01 --start-id 1250 --final-id 2000
-#   python visualize_viral_gt.py --dataset eee_03 --start-id 1250 --final-id 1500
+#   python visualize/viral_gt.py --dataset nya_01 --start-id 1250 --final-id 2000
+#   python visualize/viral_gt.py --dataset eee_03 --start-id 1250 --final-id 1500
 
 
 # python3 create_and_save_gmm_viral.py --every-n 5 --radius 30 --skip_scans 1 --bag ~/thesis/VIRAL/eee_03/eee_03.bag --n_components 100 --start-id 1250 --final-id 2000

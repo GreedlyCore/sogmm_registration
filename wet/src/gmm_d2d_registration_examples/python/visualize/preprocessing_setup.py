@@ -1,45 +1,71 @@
 #!/usr/bin/env python
 """
-Preprocessing setup visualizer for VIRAL dataset.
+Preprocessing setup visualizer for VIRAL and NCLT datasets.
 Visualizes point clouds with configurable filters: every-n, radius, voxel, mahal.
 
 Usage:
-    python visualize_preprocessing_setup.py --dataset viral --scene eee_03
-    python visualize_preprocessing_setup.py --dataset viral --scene nya_01
+    python visualize/preprocessing_setup.py --dataset viral --scene eee_03
+    python visualize/preprocessing_setup.py --dataset nclt  --scene 2013-01-10
 """
+
+"""
+~3676 idx: pre indoor scene index
+~3880 - 4070 idx: starting indoor scene index (там его ещё шатают вперёд назад неплохо так)
+
+python3 create_and_save_gmm_nclt.py \
+    --scene 2013-01-10 \
+    --every-n 5 \
+    --voxel 0.05 \
+    --start-id 3880 --final-id 4070 \
+    --mahal_distance 2.0 \
+    --n_components 150
+"""
+
 import os
+import sys
 import argparse
 import numpy as np
 from pyridescence import guik, imgui
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '../../../../../'))
+sys.path.insert(0, os.path.join(SCRIPT_DIR, '..'))
 from utils.viral_loader import (
     load_viral_lidar_config, load_viral_pointcloud,
     get_viral_scan_count, apply_transform
 )
+from utils.nclt_loader import (
+    get_nclt_sync_files, get_nclt_scan_count, load_nclt_pointcloud
+)
 from utils.pcl_filters import voxel_filter, radius_filter, every_n_filter, mahal_filter
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '../../../../'))
-
 VIRAL_BASE_PATH = os.path.join(REPO_ROOT, 'dataset/viral')
+NCLT_BASE_PATH = '/home/sonieth3/thesis/data'
 
 
 class PreprocessingVisualizer:
-    def __init__(self, scene):
+    def __init__(self, dataset, scene):
+        self.dataset = dataset
         self.scene = scene
         self.current_index = 0
 
-        bag_path = os.path.join(VIRAL_BASE_PATH, scene, f'{scene}.bag')
-        if not os.path.exists(bag_path):
-            raise FileNotFoundError(f'Bag not found: {bag_path}')
-        self.bag_path = bag_path
+        if dataset == 'viral':
+            bag_path = os.path.join(VIRAL_BASE_PATH, scene, f'{scene}.bag')
+            if not os.path.exists(bag_path):
+                raise FileNotFoundError(f'Bag not found: {bag_path}')
+            self.bag_path = bag_path
 
-        config_topic, self.T_body_lidar = load_viral_lidar_config(bag_path)
-        self.lidar_topic = config_topic or '/os1_cloud_node1/points'
+            config_topic, self.T_body_lidar = load_viral_lidar_config(bag_path)
+            self.lidar_topic = config_topic or '/os1_cloud_node1/points'
 
-        print(f'Counting scans in {bag_path}...')
-        self.total_scans = get_viral_scan_count(bag_path, self.lidar_topic)
-        print(f'VIRAL / {scene} ({self.total_scans} scans), topic: {self.lidar_topic}')
+            print(f'Counting scans in {bag_path}...')
+            self.total_scans = get_viral_scan_count(bag_path, self.lidar_topic)
+            print(f'VIRAL / {scene} ({self.total_scans} scans), topic: {self.lidar_topic}')
+
+        elif dataset == 'nclt':
+            self.nclt_files = get_nclt_sync_files(NCLT_BASE_PATH, scene)
+            self.total_scans = len(self.nclt_files)
+            print(f'NCLT / {scene} ({self.total_scans} scans)')
 
         # Filter state (order matches create_and_save_gmm_viral.py pipeline)
         self.every_n_enabled = False
@@ -65,8 +91,11 @@ class PreprocessingVisualizer:
         self.frame_counter = 0
 
     def _load_pointcloud(self, index):
-        points = load_viral_pointcloud(self.bag_path, index, self.lidar_topic)
-        points = apply_transform(points, self.T_body_lidar)
+        if self.dataset == 'viral':
+            points = load_viral_pointcloud(self.bag_path, index, self.lidar_topic)
+            points = apply_transform(points, self.T_body_lidar)
+        else:  # nclt
+            points = load_nclt_pointcloud(self.nclt_files[index])
         original = len(points)
 
         # Apply filters in same order as create_and_save_gmm_viral.py
@@ -98,7 +127,7 @@ class PreprocessingVisualizer:
 
     def run(self):
         viewer = guik.LightViewer.instance()
-        viewer.set_title(f"Preprocessing Visualizer - VIRAL/{self.scene}")
+        viewer.set_title(f"Preprocessing Visualizer - {self.dataset.upper()}/{self.scene}")
         viewer.set_point_shape(self.point_size, metric=True, circle=True)
 
         points = self._load_pointcloud(self.current_index)
@@ -110,7 +139,7 @@ class PreprocessingVisualizer:
         def ui_callback():
             imgui.begin("Controls", None)
 
-            imgui.text(f"VIRAL / {self.scene}")
+            imgui.text(f"{self.dataset.upper()} / {self.scene}")
             imgui.text(f"Frame: {self.current_index + 1} / {self.total_scans}")
             imgui.separator()
 
@@ -216,13 +245,13 @@ class PreprocessingVisualizer:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Preprocessing setup visualizer for VIRAL dataset')
-    parser.add_argument('--dataset', type=str, required=True, choices=['viral'])
+    parser = argparse.ArgumentParser(description='Preprocessing setup visualizer for VIRAL/NCLT datasets')
+    parser.add_argument('--dataset', type=str, required=True, choices=['viral', 'nclt'])
     parser.add_argument('--scene', type=str, required=True,
-                        help='Scene name (e.g., eee_03, nya_01)')
+                        help='Scene name (e.g., eee_03 for VIRAL, 2013-01-10 for NCLT)')
     args = parser.parse_args()
 
-    visualizer = PreprocessingVisualizer(args.scene)
+    visualizer = PreprocessingVisualizer(args.dataset, args.scene)
     visualizer.run()
 
 

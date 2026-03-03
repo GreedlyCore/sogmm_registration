@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 """
-python visualize_viral_gt.py --dataset nya_01 --start-id 1250 --final-id 2000
-python visualize_viral_gt.py --dataset eee_03 --start-id 1250 --final-id 1500
+python visualize/viral_gt.py --dataset nya_01 --start-id 1250 --final-id 2000
+python visualize/viral_gt.py --dataset eee_03 --start-id 1250 --final-id 1500
 """
 
 

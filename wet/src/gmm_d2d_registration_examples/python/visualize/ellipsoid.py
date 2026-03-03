@@ -17,6 +17,8 @@ TODO: Add Box-Muller sampling method as an alternative visualization option
 
 import argparse
 import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from utils.open3d_visualizer import InteractiveEllipsoidVisualizer
 
 

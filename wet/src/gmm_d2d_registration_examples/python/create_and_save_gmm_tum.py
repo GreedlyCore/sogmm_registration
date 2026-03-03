@@ -20,6 +20,7 @@ from tqdm import tqdm
 from utils.save_gmm import save_sogmm
 from utils.pcl_filters import voxel_filter, radius_filter, every_n_filter
 from utils.gmm_fitter import fit_gmm, make_output_dir, detect_implementation
+from utils.tum_loader import load_tum_pointcloud
 
 
 def convert_tum_to_gmm(pcld_dir, output_dir, n_components=None,
@@ -76,6 +77,8 @@ def convert_tum_to_gmm(pcld_dir, output_dir, n_components=None,
         'bandwidth':    bandwidth    if implementation == 'sogmm' else None,
         'every_n': every_n, 'voxel': voxel, 'radius': radius,
         'mahal_distance': mahal_distance, 'redux_kmeans': redux_kmeans,
+        'start_idx': start_idx,
+        'end_idx': end_idx,
     }
     meta = {k: v for k, v in meta.items() if v is not None}
     with open(os.path.join(gmm_output_dir, 'meta.yaml'), 'w') as f:
@@ -99,7 +102,7 @@ def convert_tum_to_gmm(pcld_dir, output_dir, n_components=None,
             t0 = _time.time()
             filepath = os.path.join(pcld_dir, txt_file)
 
-            points_4d = np.loadtxt(filepath, delimiter=',').astype(np.float32)
+            points_4d = load_tum_pointcloud(filepath)
             print(f'\n  [{txt_file}] loadtxt: {_time.time()-t0:.2f}s, shape={points_4d.shape}')
 
             original = len(points_4d)
@@ -140,7 +143,9 @@ def convert_tum_to_gmm(pcld_dir, output_dir, n_components=None,
     finally:
         _flush_meta()
 
-    print(f'\nSaved GMM files to: {gmm_output_dir}')
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    display_path = '~/' + os.path.relpath(gmm_output_dir, script_dir)
+    print(f'\nSaved GMM files to: {display_path}')
 
 
 def main():
@@ -155,9 +160,9 @@ def main():
     parser.add_argument('--every-n',     type=int,   default=None, dest='every_n')
     parser.add_argument('--voxel',       type=float, default=None)
     parser.add_argument('--radius',      type=float, default=None)
-    parser.add_argument('--start_idx',   type=int,   default=0)
-    parser.add_argument('--end_idx',     type=int,   default=None)
-    parser.add_argument('--mahal_distance', type=float, default=None)
+    parser.add_argument('--start-id',    type=int,   default=0,    dest='start_idx')
+    parser.add_argument('--end-id',      type=int,   default=None, dest='end_idx')
+    parser.add_argument('--mahal',       type=float, default=None, dest='mahal_distance')
     parser.add_argument('--redux_kmeans',   type=int,   default=None)
 
     args = parser.parse_args()

@@ -26,7 +26,7 @@ from utils.pcl_filters import voxel_filter, radius_filter, every_n_filter
 from utils.save_gmm import save_sogmm
 from utils.gmm_fitter import fit_gmm, make_output_dir, detect_implementation
 
-NCLT_BASE_PATH = '/home/sonieth3/thesis/data'
+NCLT_BASE_PATH = os.path.expanduser('~/thesis/data')
 
 
 def convert_nclt_to_gmm(scene, output_dir, n_components=None,
@@ -151,7 +151,9 @@ def convert_nclt_to_gmm(scene, output_dir, n_components=None,
         saved_count += 1
         scan_idx += 1
 
-    print(f'\nSaved {saved_count} GMM files to: {gmm_output_dir}')
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    display_path = '~/' + os.path.relpath(gmm_output_dir, script_dir)
+    print(f'\nSaved {saved_count} GMM files to: {display_path}')
 
 
 def main():

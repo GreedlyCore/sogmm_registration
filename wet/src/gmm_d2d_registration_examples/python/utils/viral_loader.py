@@ -16,7 +16,7 @@ from rosbags.typesys import Stores, get_typestore
 T_BODY_PRISM = np.array([-0.293656, -0.012288, -0.273095])
 
 # Default path to ntuviral_gt repository
-DEFAULT_GT_PATH = '/home/sonieth2/thesis/VIRAL/ntuviral_gt'
+DEFAULT_GT_PATH = os.path.expanduser('~/thesis/data/VIRAL/ntuviral_gt')
 
 
 def _opencv_matrix_constructor(loader, node):

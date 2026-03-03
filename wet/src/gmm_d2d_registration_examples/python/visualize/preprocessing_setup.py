@@ -40,7 +40,7 @@ from utils.nclt_loader import (
 from utils.pcl_filters import voxel_filter, radius_filter, every_n_filter, mahal_filter
 
 VIRAL_BASE_PATH = os.path.join(REPO_ROOT, 'dataset/viral')
-NCLT_BASE_PATH = '/home/sonieth3/thesis/data'
+NCLT_BASE_PATH = os.path.expanduser('~/thesis/data')
 
 
 class PreprocessingVisualizer:

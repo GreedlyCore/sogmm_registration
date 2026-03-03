@@ -14,7 +14,7 @@ import pickle
 from pathlib import Path
 
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('qtagg')
 import numpy as np
 from tqdm import tqdm
 

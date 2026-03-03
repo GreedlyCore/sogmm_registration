@@ -1,0 +1,8 @@
+{
+  "name": "ndt_registration",
+  "dependencies": {
+    "eigen_colcon",
+    "ndt_map"
+  },
+  "hooks": []
+}

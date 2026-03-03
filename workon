@@ -40,6 +40,13 @@ if [ -f $WET_INSTALL_DIR/setup.sh ]; then
 	   eval 'export PATH=$package:$PATH'
 	   # Add each package directory to CMAKE_PREFIX_PATH
 	   eval 'export CMAKE_PREFIX_PATH=$package:$CMAKE_PREFIX_PATH'
+	   # Handle editable (egg-link) installs: add the source path they point to
+	   for egglink in $package/lib/python*/site-packages/*.egg-link; do
+	       if [ -f "$egglink" ]; then
+		   eggpath="$(head -1 $egglink)"
+		   eval 'export PYTHONPATH=$eggpath:$PYTHONPATH'
+	       fi
+	   done
        fi
    done
 fi

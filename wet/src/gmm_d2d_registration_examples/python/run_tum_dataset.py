@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('qtagg')
 from utils.run_dataset import run_dataset
 from utils.plot_results import plot_results
 from utils.gmm_folder import detect_gmm_range
@@ -16,11 +16,11 @@ from utils.metrics import compute_metrics
 # python create_and_save_gmm_tum.py --n_components 200 --every_n_filter --every_n 5 --voxel_filter --voxel_size 0.04
 # --> around 7k points per 7s estimation required
 
-# python run_tum_dataset.py --gmm_dir /home/sonieth2/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/runs/tum_rgbd_dataset_freiburg3_long_office_household/adaptive_bw1_components_17021334
-# python run_tum_dataset.py --gmm_dir /home/sonieth2/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/runs/tum_rgbd_dataset_freiburg3_long_office_household/100_components_17021309
+# python run_tum_dataset.py --gmm_dir ~/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/runs/tum_rgbd_dataset_freiburg3_long_office_household/adaptive_bw1_components_17021334
+# python run_tum_dataset.py --gmm_dir ~/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/runs/tum_rgbd_dataset_freiburg3_long_office_household/100_components_17021309
 
 # official confirmed
-# python3 run_tum_dataset.py --gmm_dir /home/sonieth2/thesis/sogmm_registration/data/rgbd_dataset_freiburg3_long_office_household/100_components
+# python3 run_tum_dataset.py --gmm_dir ~/thesis/sogmm_registration/data/rgbd_dataset_freiburg3_long_office_household/100_components
 # RMSE  translation : 0.003313 m
 # RMSE  rotation    : 0.361263 deg  (0.006305 rad)
 # OE    translation : 0.002763 m
@@ -29,7 +29,7 @@ from utils.metrics import compute_metrics
 
 # bw = 0.04
 # Detected scan range: 0 to 284 (step=1)
-# GMM dir: /home/sonieth2/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/runs/tum_rgbd_dataset_freiburg3_long_office_household/bw4_components_25021452
+# GMM dir: ~/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/runs/tum_rgbd_dataset_freiburg3_long_office_household/bw4_components_25021452
 # Pairs: 284 (scans 0 to 284)
 # 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████| 284/284 [06:10<00:00,  1.31s/it]
 # RMSE  translation : 0.045729 m
@@ -41,7 +41,7 @@ from utils.metrics import compute_metrics
 
 # bw = 0.03
 # Detected scan range: 0 to 103 (step=1)
-# GMM dir: /home/sonieth2/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/runs/tum_rgbd_dataset_freiburg3_long_office_household/bw3_components_25021631
+# GMM dir: ~/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/runs/tum_rgbd_dataset_freiburg3_long_office_household/bw3_components_25021631
 # Pairs: 103 (scans 0 to 103)
 # 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████| 103/103 [04:50<00:00,  2.82s/it]
 # RMSE  translation : 0.074818 m
@@ -54,7 +54,7 @@ from utils.metrics import compute_metrics
 
 # bw = 0.02
 # Detected scan range: 0 to 102 (step=1)
-# GMM dir: /home/sonieth2/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/runs/tum_rgbd_dataset_freiburg3_long_office_household/bw2_components_25021707
+# GMM dir: ~/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/runs/tum_rgbd_dataset_freiburg3_long_office_household/bw2_components_25021707
 # Pairs: 102 (scans 0 to 102)
 # 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████| 102/102 [18:42<00:00, 11.01s/it]
 # RMSE  translation : 0.075293 m
@@ -129,7 +129,8 @@ def main():
 
     transforms, ground_truths = run_dataset(
         args.dataset, pair_first, pair_last,
-        args.prefix, args.n_components, GMM_DIR=gmm_dir)
+        args.prefix, args.n_components, GMM_DIR=gmm_dir,
+        init_method='com')
 
     compute_metrics(transforms, ground_truths)
 

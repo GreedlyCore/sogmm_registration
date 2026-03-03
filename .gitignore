@@ -14,8 +14,6 @@ log/
 data/
 dataset/
 
-*.md
-
 # Workspace-specific
 dry/src/open3d_colcon/
 dry/.venv

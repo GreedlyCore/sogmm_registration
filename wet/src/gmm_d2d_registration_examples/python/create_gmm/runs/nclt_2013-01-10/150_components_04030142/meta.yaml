@@ -1,0 +1,10 @@
+dataset: NCLT
+scene: '2013-01-10'
+implementation: fixed
+n_components: 150
+every_n: 5
+voxel: 0.05
+skip_scans: 1
+start_id: 3880
+final_id: 4070
+mahal_distance: 2.0

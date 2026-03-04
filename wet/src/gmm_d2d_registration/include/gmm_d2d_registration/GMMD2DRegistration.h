@@ -139,7 +139,8 @@ public:
                      dRdu, d2Rdu2,
                      false,
                      fval, grad, H);
-      //std::cout << "Got f["<<num_func_calls<<"] = " << fval << std::endl;
+      // Was uncommented for using in `debug_registration.py` script
+      std::cout << "Got f["<<num_func_calls<<"] = " << fval << std::endl;
 
       return fval;
     }

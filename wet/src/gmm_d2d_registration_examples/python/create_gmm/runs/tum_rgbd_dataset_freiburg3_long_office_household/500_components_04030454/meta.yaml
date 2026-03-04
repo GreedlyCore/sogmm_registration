@@ -1,0 +1,6 @@
+dataset: TUM
+implementation: fixed
+n_components: 500
+voxel: 0.05
+start_idx: 100
+end_idx: 400

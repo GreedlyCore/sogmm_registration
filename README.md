@@ -20,4 +20,15 @@ https://robots.engin.umich.edu/nclt/
 
 ------
 
-                                                                                                                                        
+❯ i wanna make it work with relative paths too: ~/runs/ just because for convivent short path                                                                                
+                                                                                              
+● Simplest fix — just create a symlink once:                                                                                                                                 
+                                         
+  ln -s /home/sonieth3/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/create_gmm/runs ~/runs                                                         
+               
+Then ~/runs/nclt_2013-01-10/... will work everywhere — not just in this script but in any tool you use.                                                                    
+
+ln -s /home/sonieth3/thesis/sogmm_registration/wet/src/gmm_d2d_registration_examples/python/create_gmm/runs ~/runs
+Create ~/runs symlink to GMM runs directory
+
+python debug_registration.py ~/runs/nclt_2013-01-10/150_components_04030142/3880.gmm  ~/runs/nclt_2013-01-10/150_components_04030142/3881.gmm --init com

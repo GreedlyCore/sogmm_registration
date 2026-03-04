@@ -1,0 +1,7 @@
+dataset: TUM
+implementation: fixed
+n_components: 150
+skip_scans: 50
+voxel: 0.05
+start_idx: 0
+end_idx: 2509
